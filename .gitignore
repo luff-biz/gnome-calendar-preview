@@ -1,0 +1,8 @@
+gschemas.compiled
+*.shell-extension.zip
+*.mo
+
+# test artifacts
+test/cfg/
+test/*.log
+test/appointments.mjs

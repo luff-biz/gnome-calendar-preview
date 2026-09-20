@@ -1,0 +1,23 @@
+/* Productive Calendar — deliberately small: the shell theme provides the
+   palette, these rules only handle spacing and emphasis. */
+
+.productive-calendar-row {
+    spacing: 12px;
+    padding: 2px 0;
+}
+
+.productive-calendar-row .event-summary {
+    min-width: 0;
+}
+
+.productive-calendar-row .event-time {
+    opacity: 0.7;
+}
+
+.productive-calendar-running .event-summary {
+    font-weight: bold;
+}
+
+.productive-calendar-running .event-time {
+    opacity: 1;
+}
