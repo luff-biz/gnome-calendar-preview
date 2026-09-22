@@ -1,1 +1,0 @@
-Fehler: GDBus.Error:org.freedesktop.DBus.Error.UnknownMethod: Das Objekt existiert nicht am Pfad »/org/gnome/Shell/Extensions«

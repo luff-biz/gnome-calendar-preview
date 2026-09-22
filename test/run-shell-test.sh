@@ -72,30 +72,10 @@ done
 
 sleep 8
 
-gdbus call --session --dest org.gnome.Shell --object-path /org/gnome/Shell/Extensions \
-    --method org.gnome.Shell.Extensions.GetExtensionInfo "$UUID" > "$HERE/extension-info.txt" 2>&1
-
 kill "$SHELL_PID" "$STUB" 2>/dev/null
 sleep 1
 pkill -f 'gnome-shell --headless' 2>/dev/null
 sleep 1
-
-echo
-echo "=== Extension-Status ==="
-python3 - "$HERE/extension-info.txt" <<'PY'
-import ast, re, sys
-raw = open(sys.argv[1]).read()
-states = {1: 'ENABLED', 2: 'DISABLED', 3: 'ERROR', 4: 'OUT_OF_DATE', 5: 'DOWNLOADING'}
-m = re.search(r"'state': <(\d+)>", raw)
-if m:
-    code = int(m.group(1))
-    print(f"  state: {code} ({states.get(code, 'unbekannt')})")
-    if code == 3:
-        err = re.search(r"'error': <'([^']*)'>", raw)
-        print(f"  FEHLER: {err.group(1) if err else 'unbekannt'}")
-else:
-    print('  kein Status lesbar:', raw[:300])
-PY
 
 echo
 echo "=== Zeilen der Extension im Shell-Log ==="

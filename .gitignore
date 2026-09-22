@@ -7,3 +7,4 @@ test/cfg/
 test/.runtime/
 test/*.log
 test/appointments.mjs
+test/extension-info.txt
