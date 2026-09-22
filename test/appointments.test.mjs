@@ -68,6 +68,7 @@ ok(A.isRunning(allDayRunning, now), 'isRunning: laufender Ganztagstermin');
 
 const withUid = {id: 'aaaa\nbbbb\n20261024T120000Z', date: at(0, 9), end: at(0, 10), summary: 'x'};
 eq(A.sourceUidOf(withUid), 'aaaa', 'sourceUidOf: erster Teil der id');
+eq(A.eventUidOf(withUid), 'bbbb', 'eventUidOf: zweiter Teil der id');
 eq(A.sourceUidOf({date: at(0, 9), end: at(0, 10)}), '', 'sourceUidOf: ohne id leer');
 
 // ---- formatWhen (Steffens Vorlage) ----------------------------------------

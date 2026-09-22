@@ -17,6 +17,7 @@ import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import Pango from 'gi://Pango';
+import Shell from 'gi://Shell';
 import St from 'gi://St';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
@@ -24,7 +25,7 @@ import * as Calendar from 'resource:///org/gnome/shell/ui/calendar.js';
 import {formatTime} from 'resource:///org/gnome/shell/misc/dateUtils.js';
 import {Extension, gettext as _} from 'resource:///org/gnome/shell/extensions/extension.js';
 
-import {formatWhen, isSameDay, selectAppointments, sourceUidOf, widenedWindow}
+import {eventUidOf, formatWhen, isSameDay, selectAppointments, sourceUidOf, widenedWindow}
     from './lib/appointments.js';
 
 const MAX_LOOKAHEAD_DAYS = 730; // harte Obergrenze beim Vergrößern des Fensters
@@ -39,6 +40,7 @@ const RUNNING_OPACITY = 191; // 75 %
 // gedimmte Block nie gefüllt werden.
 const PAST_WINDOW_DAYS = 7;
 
+const CALENDAR_APP_ID = 'org.gnome.Calendar.desktop';
 const SERVER_BUS_NAME = 'org.gnome.Shell.CalendarServer';
 const SERVER_PATH = '/org/gnome/Shell/CalendarServer';
 const SERVER_IFACE = 'org.gnome.Shell.CalendarServer';
@@ -58,16 +60,12 @@ const SETTINGS_KEYS = [
  * darunter klein der Kalendername. Reine Anzeige, kein Klickziel.
  */
 class UpcomingSection {
-    constructor({formatEvent}) {
+    constructor({formatEvent, onActivate}) {
         this._formatEvent = formatEvent;
-        this._button = new St.Button({
-            style_class: 'events-button productive-calendar-section',
-            reactive: false,
-            can_focus: false,
-            x_expand: true,
-        });
-        this._box = new St.BoxLayout({
-            style_class: 'events-box',
+        this._onActivate = onActivate;
+        // Der Abschnitt selbst ist keine Schaltfläche mehr — die Zeilen sind es.
+        this._actor = new St.BoxLayout({
+            style_class: 'events-box productive-calendar-section',
             orientation: Clutter.Orientation.VERTICAL,
             x_expand: true,
         });
@@ -76,12 +74,20 @@ class UpcomingSection {
             orientation: Clutter.Orientation.VERTICAL,
             x_expand: true,
         });
-        this._box.add_child(this._list);
-        this._button.set_child(this._box);
+        this._actor.add_child(this._list);
+        // Merkt sich den Abbau: Nach dem Zerstören darf nichts mehr anfassen.
+        this._disposed = false;
+        this._actor.connect('destroy', () => {
+            this._disposed = true;
+        });
     }
 
     get actor() {
-        return this._button;
+        return this._actor;
+    }
+
+    get disposed() {
+        return this._disposed;
     }
 
     /** Die fertige zweite Zeile eines Eintrags — auch für die Protokollierung. */
@@ -95,6 +101,9 @@ class UpcomingSection {
      * Ganz oben steht keine Überschrift.
      */
     setEvents({past, running, bright}, now) {
+        if (this._disposed)
+            return;
+
         for (const child of this._list.get_children())
             child.destroy();
 
@@ -136,22 +145,32 @@ class UpcomingSection {
     _makeRow(event, now, opacity) {
         const line = this._formatEvent(event, now);
 
-        const row = new St.BoxLayout({
-            style_class: 'productive-calendar-row',
+        const box = new St.BoxLayout({
             orientation: Clutter.Orientation.VERTICAL,
             x_expand: true,
         });
-        row.opacity = opacity;
-
-        row.add_child(this._label('event-summary', event.summary || _('Ohne Titel')));
-        row.add_child(this._label('event-time', line.when));
+        box.add_child(this._label('event-summary', event.summary || _('Ohne Titel')));
+        box.add_child(this._label('event-time', line.when));
 
         if (line.calendar) {
             const name = this._label('productive-calendar-calendar', line.calendar);
             name.opacity = 178; // zurückgenommen; die Zeile dimmt zusätzlich
-            row.add_child(name);
+            box.add_child(name);
         }
 
+        // Jede Zeile ist eine eigene Schaltfläche. `popup-menu-item` ist die
+        // Standard-Klasse der Shell für Hover in Popups: Hintergrund, Radius
+        // und Abstände kommen vom Theme — keine Eigenfarbe.
+        const row = new St.Button({
+            style_class: 'popup-menu-item productive-calendar-row',
+            x_expand: true,
+            reactive: true,
+            can_focus: false,
+            track_hover: true,
+            child: box,
+        });
+        row.opacity = opacity;
+        row.connect('clicked', () => this._onActivate?.(event));
         return row;
     }
 
@@ -209,6 +228,7 @@ export default class ProductiveCalendarExtension extends Extension {
                 }),
                 calendar: this._calendarNames.get(sourceUidOf(event)) ?? null,
             }),
+            onActivate: event => this._openInCalendar(event),
         });
 
         this._openStateId = this._dateMenu.menu.connect('open-state-changed', (menu, isOpen) => {
@@ -400,7 +420,7 @@ export default class ProductiveCalendarExtension extends Extension {
     }
 
     _rebuild() {
-        if (!this._section || !this._eventSource)
+        if (!this._section || this._section.disposed || !this._eventSource)
             return;
 
         const now = new Date();
@@ -508,6 +528,23 @@ export default class ProductiveCalendarExtension extends Extension {
     _applySettings() {
         if (this._dateMenu?._calendar)
             this._dateMenu._calendar.visible = !this._settings.get_boolean('hide-calendar-grid');
+    }
+
+    /** Klick auf eine Zeile: den Termin direkt in GNOME Kalender öffnen. */
+    _openInCalendar(event) {
+        const uid = eventUidOf(event);
+        if (!uid)
+            return;
+
+        const app = Shell.AppSystem.get_default().lookup_app(CALENDAR_APP_ID);
+        if (!app) {
+            log('[productive-calendar] GNOME Calendar nicht gefunden');
+            return;
+        }
+
+        Main.panel.closeCalendar();
+        const context = global.create_app_launch_context(0, -1);
+        app.launch(['-u', uid], context);
     }
 
     /**

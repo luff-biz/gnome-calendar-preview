@@ -3,12 +3,11 @@
    weil CSS `opacity` in St nicht verlässlich greift. Hier stehen nur Abstände,
    Betonung und Schriftgrößen. */
 
-.productive-calendar-row {
-    spacing: 1px;
-    padding: 2px 0;
-}
+/* Productive Calendar — bewusst klein gehalten: Hover, Radius und Abstände der
+   Zeilen kommen vom Theme über die Klasse `popup-menu-item`. Hier stehen nur
+   Betonung und Schriftgrößen, die das Theme für diesen Abschnitt nicht kennt. */
 
-/* Titel fett — eigene Regel, damit es nicht vom Thema abhängt. */
+/* Titel fett. */
 .productive-calendar-row .event-summary {
     font-weight: bold;
     min-width: 0;

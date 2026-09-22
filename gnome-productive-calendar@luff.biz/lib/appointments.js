@@ -99,6 +99,11 @@ export function sourceUidOf(event) {
     return event.id?.split('\n')[0] ?? '';
 }
 
+/** Termin-UID (zweiter Teil der id) — Schlüssel für `gnome-calendar -u`. */
+export function eventUidOf(event) {
+    return event.id?.split('\n')[1] ?? '';
+}
+
 function byStart(a, b) {
     return a.date - b.date || a.end - b.end || (a.summary ?? '').localeCompare(b.summary ?? '');
 }
