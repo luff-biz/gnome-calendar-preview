@@ -40,3 +40,24 @@ name disappears, not something the extension causes.
 
 The extension has to be installed first (`../install.sh`); the test drives the
 installed copy, like the shell does.
+
+## Settings window
+
+```sh
+./run-prefs-test.sh
+```
+
+Opens the extension's settings window on a virtual monitor in an isolated
+session (private bus, private dconf, headless shell) and checks that the process
+stays up and logs nothing. Two environment details matter:
+
+- a **classic `dbus-daemon`** is used instead of `dbus-run-session`, because
+  dbus-broker activates services through systemd, which does not exist in a
+  private session — the accessibility chain (`org.a11y.Bus` → registry) would
+  otherwise fail and GTK would abort while registering the application
+- `GTK_A11Y=none` additionally keeps GTK from insisting on that chain
+
+A screenshot of the window is **not** part of this test: `org.gnome.Shell.Screenshot`
+refuses calls that do not come from the shell itself (`Screenshot is not allowed`).
+The evidence is the running process plus an empty error log — a mistyped or
+missing settings key would surface as a GSettings warning there.

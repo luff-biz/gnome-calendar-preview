@@ -3,42 +3,42 @@
   <schema id="org.gnome.shell.extensions.gnome-productive-calendar"
           path="/org/gnome/shell/extensions/gnome-productive-calendar/">
 
+    <key name="hide-calendar-grid" type="b">
+      <default>true</default>
+      <summary>Monatsgitter ausblenden</summary>
+      <description>Blendet den Monatskalender im Datumsmenü aus. Es bleiben die Kopfzeile und die Terminliste. Aus ist der Zustand, den GNOME mitbringt.</description>
+    </key>
+
     <key name="event-count" type="i">
       <default>6</default>
       <range min="1" max="20"/>
-      <summary>Number of appointments</summary>
-      <description>How many upcoming appointments the list shows.</description>
+      <summary>Anzahl der Termine</summary>
+      <description>Wie viele der nächsten Termine die Liste zeigt.</description>
     </key>
 
     <key name="lookahead-days" type="i">
       <default>120</default>
       <range min="1" max="730"/>
-      <summary>Lookahead window (days)</summary>
-      <description>How far ahead the extension asks the calendar server for appointments. Widened automatically when the window does not contain enough entries.</description>
+      <summary>Vorschau-Zeitraum (Tage)</summary>
+      <description>Wie weit voraus beim Kalenderdienst angefragt wird. Wird automatisch vergrößert, wenn der Zeitraum zu wenige Termine enthält.</description>
     </key>
 
     <key name="show-all-day" type="b">
       <default>true</default>
-      <summary>Include all-day entries</summary>
-      <description>When disabled, only timed appointments are listed.</description>
+      <summary>Ganztägige Termine anzeigen</summary>
+      <description>Geburtstage, Ferien und andere ganztägige Einträge mitzählen.</description>
     </key>
 
     <key name="open-calendar-on-click" type="b">
-      <default>true</default>
-      <summary>Open GNOME Calendar on click</summary>
-      <description>Clicking the appointment list opens GNOME Calendar.</description>
-    </key>
-
-    <key name="hide-calendar-grid" type="b">
       <default>false</default>
-      <summary>Hide the month grid</summary>
-      <description>Hides the month grid in the date menu, leaving the appointment list. The day header stays.</description>
+      <summary>Klick öffnet GNOME Calendar</summary>
+      <description>Ein Klick auf einen Termin öffnet GNOME Calendar.</description>
     </key>
 
     <key name="debug-logging" type="b">
       <default>false</default>
-      <summary>Log to the journal</summary>
-      <description>Logs which appointments were rendered and which window was requested, for troubleshooting (journalctl --user -u org.gnome.Shell.desktop -f).</description>
+      <summary>Ins Journal protokollieren</summary>
+      <description>Schreibt mit, welche Termine angezeigt und welcher Zeitraum angefragt wurde — zur Fehlersuche (journalctl --user -b | grep productive-calendar).</description>
     </key>
 
   </schema>

@@ -1,4 +1,5 @@
 import Adw from 'gi://Adw';
+import Gio from 'gi://Gio';
 import Gtk from 'gi://Gtk';
 
 import {ExtensionPreferences, gettext as _} from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
@@ -8,20 +9,38 @@ export default class ProductiveCalendarPreferences extends ExtensionPreferences 
         const settings = this.getSettings();
 
         const page = new Adw.PreferencesPage({
-            title: _('Productive Calendar'),
+            title: _('Terminliste'),
             icon_name: 'x-office-calendar-symbolic',
         });
         window.add(page);
 
+        // ---- Kalender ----------------------------------------------------
+
+        const calendarGroup = new Adw.PreferencesGroup({
+            title: _('Kalender'),
+            description: _('Der Monatskalender im Datumsmenü'),
+        });
+        page.add(calendarGroup);
+
+        const gridRow = new Adw.SwitchRow({
+            title: _('Monatsgitter ausblenden'),
+            subtitle: _('Der Monatskalender nimmt Platz weg. Es bleiben die Kopfzeile und die Terminliste.'),
+        });
+        settings.bind('hide-calendar-grid', gridRow, 'active',
+            Gio.SettingsBindFlags.DEFAULT);
+        calendarGroup.add(gridRow);
+
+        // ---- Terminliste -------------------------------------------------
+
         const listGroup = new Adw.PreferencesGroup({
-            title: _('List'),
-            description: _('What the appointment list in the date menu shows.'),
+            title: _('Terminliste'),
+            description: _('Was anstelle der Tagesliste angezeigt wird'),
         });
         page.add(listGroup);
 
         const countRow = new Adw.SpinRow({
-            title: _('Number of appointments'),
-            subtitle: _('How many upcoming appointments to show'),
+            title: _('Anzahl der Termine'),
+            subtitle: _('Wie viele der nächsten Termine angezeigt werden'),
             adjustment: new Gtk.Adjustment({
                 lower: 1, upper: 20, step_increment: 1, page_increment: 5,
                 value: settings.get_int('event-count'),
@@ -34,19 +53,16 @@ export default class ProductiveCalendarPreferences extends ExtensionPreferences 
         listGroup.add(countRow);
 
         const allDayRow = new Adw.SwitchRow({
-            title: _('Include all-day entries'),
-            subtitle: _('Birthdays, holidays and other all-day entries'),
-            active: settings.get_boolean('show-all-day'),
+            title: _('Ganztägige Termine anzeigen'),
+            subtitle: _('Geburtstage, Ferien und andere ganztägige Einträge'),
         });
-        allDayRow.connect('notify::active', () =>
-            settings.set_boolean('show-all-day', allDayRow.get_active()));
-        settings.connect('changed::show-all-day', () =>
-            allDayRow.set_active(settings.get_boolean('show-all-day')));
+        settings.bind('show-all-day', allDayRow, 'active',
+            Gio.SettingsBindFlags.DEFAULT);
         listGroup.add(allDayRow);
 
         const windowRow = new Adw.SpinRow({
-            title: _('Lookahead window'),
-            subtitle: _('Days to look ahead — widened automatically when needed'),
+            title: _('Vorschau-Zeitraum'),
+            subtitle: _('Tage in die Zukunft — wird bei Bedarf automatisch vergrößert'),
             adjustment: new Gtk.Adjustment({
                 lower: 1, upper: 730, step_increment: 10, page_increment: 60,
                 value: settings.get_int('lookahead-days'),
@@ -58,39 +74,25 @@ export default class ProductiveCalendarPreferences extends ExtensionPreferences 
             windowRow.set_value(settings.get_int('lookahead-days')));
         listGroup.add(windowRow);
 
-        const behaviourGroup = new Adw.PreferencesGroup({title: _('Behaviour')});
+        // ---- Verhalten ---------------------------------------------------
+
+        const behaviourGroup = new Adw.PreferencesGroup({title: _('Verhalten')});
         page.add(behaviourGroup);
 
         const clickRow = new Adw.SwitchRow({
-            title: _('Open GNOME Calendar on click'),
-            active: settings.get_boolean('open-calendar-on-click'),
+            title: _('Klick öffnet GNOME Calendar'),
+            subtitle: _('Aus: die Liste ist reine Anzeige und nicht anklickbar'),
         });
-        clickRow.connect('notify::active', () =>
-            settings.set_boolean('open-calendar-on-click', clickRow.get_active()));
-        settings.connect('changed::open-calendar-on-click', () =>
-            clickRow.set_active(settings.get_boolean('open-calendar-on-click')));
+        settings.bind('open-calendar-on-click', clickRow, 'active',
+            Gio.SettingsBindFlags.DEFAULT);
         behaviourGroup.add(clickRow);
 
-        const gridRow = new Adw.SwitchRow({
-            title: _('Hide the month grid'),
-            subtitle: _('Leaves the header and the appointment list'),
-            active: settings.get_boolean('hide-calendar-grid'),
-        });
-        gridRow.connect('notify::active', () =>
-            settings.set_boolean('hide-calendar-grid', gridRow.get_active()));
-        settings.connect('changed::hide-calendar-grid', () =>
-            gridRow.set_active(settings.get_boolean('hide-calendar-grid')));
-        behaviourGroup.add(gridRow);
-
         const debugRow = new Adw.SwitchRow({
-            title: _('Log to the journal'),
-            subtitle: _('For troubleshooting: which appointments were rendered'),
-            active: settings.get_boolean('debug-logging'),
+            title: _('Ins Journal protokollieren'),
+            subtitle: _('Zur Fehlersuche: welche Termine angezeigt wurden'),
         });
-        debugRow.connect('notify::active', () =>
-            settings.set_boolean('debug-logging', debugRow.get_active()));
-        settings.connect('changed::debug-logging', () =>
-            debugRow.set_active(settings.get_boolean('debug-logging')));
+        settings.bind('debug-logging', debugRow, 'active',
+            Gio.SettingsBindFlags.DEFAULT);
         behaviourGroup.add(debugRow);
     }
 }

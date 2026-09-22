@@ -38,12 +38,16 @@ Wayland.
 gnome-extensions prefs gnome-productive-calendar@luff.biz
 ```
 
-- **Number of appointments** — how many entries the list shows (default: 6)
-- **Include all-day entries** — births, holidays, school breaks (default: on)
-- **Lookahead window** — days asked for up front (default: 120), widened
+The settings window is currently labelled in German.
+
+- **Monatsgitter ausblenden** — hides the month grid in the date menu, leaving
+  the day header and the appointment list (default: **on**)
+- **Anzahl der Termine** — how many entries the list shows (default: **6**)
+- **Ganztägige Termine anzeigen** — births, holidays, school breaks (default: on)
+- **Vorschau-Zeitraum** — days asked for up front (default: 120), widened
   automatically when the window does not hold enough entries
-- **Open GNOME Calendar on click** (default: on)
-- **Hide the month grid** — leaves the day header and the list
+- **Klick öffnet GNOME Calendar** (default: **off**)
+- **Ins Journal protokollieren** — troubleshooting (default: off)
 
 ## How it works
 
