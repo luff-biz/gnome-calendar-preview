@@ -3,6 +3,12 @@
   <schema id="org.gnome.shell.extensions.gnome-productive-calendar"
           path="/org/gnome/shell/extensions/gnome-productive-calendar/">
 
+    <key name="show-past" type="b">
+      <default>true</default>
+      <summary>Vergangene und laufende Termine anzeigen</summary>
+      <description>Zeigt zusätzlich die letzten zwei beendeten und den gerade laufenden Termin, bei 50 Prozent Deckkraft.</description>
+    </key>
+
     <key name="hide-calendar-grid" type="b">
       <default>true</default>
       <summary>Monatsgitter ausblenden</summary>
@@ -27,12 +33,6 @@
       <default>true</default>
       <summary>Ganztägige Termine anzeigen</summary>
       <description>Geburtstage, Ferien und andere ganztägige Einträge mitzählen.</description>
-    </key>
-
-    <key name="open-calendar-on-click" type="b">
-      <default>false</default>
-      <summary>Klick öffnet GNOME Calendar</summary>
-      <description>Ein Klick auf einen Termin öffnet GNOME Calendar.</description>
     </key>
 
     <key name="debug-logging" type="b">

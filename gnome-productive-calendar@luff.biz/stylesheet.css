@@ -1,23 +1,26 @@
-/* Productive Calendar — deliberately small: the shell theme provides the
-   palette, these rules only handle spacing and emphasis. */
+/* Productive Calendar — bewusst klein gehalten: die Palette kommt vom Shell-Thema.
+   Deckkraft und Zurücknahme der Kalenderzeile werden direkt am Widget gesetzt,
+   weil CSS `opacity` in St nicht verlässlich greift. Hier stehen nur Abstände,
+   Betonung und Schriftgrößen. */
 
 .productive-calendar-row {
-    spacing: 12px;
+    spacing: 1px;
     padding: 2px 0;
 }
 
+/* Titel fett — eigene Regel, damit es nicht vom Thema abhängt. */
 .productive-calendar-row .event-summary {
+    font-weight: bold;
     min-width: 0;
 }
 
-.productive-calendar-row .event-time {
-    opacity: 0.7;
+/* Kalenderbezeichnung: klein. */
+.productive-calendar-row .productive-calendar-calendar {
+    font-size: 0.9em;
 }
 
-.productive-calendar-running .event-summary {
+/* Zwischenüberschriften: "Laufende Termine", "Nächste 6 Termine". */
+.productive-calendar-section .productive-calendar-heading {
     font-weight: bold;
-}
-
-.productive-calendar-running .event-time {
-    opacity: 1;
+    padding-top: 4px;
 }

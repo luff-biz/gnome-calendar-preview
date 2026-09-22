@@ -4,5 +4,6 @@ gschemas.compiled
 
 # test artifacts
 test/cfg/
+test/.runtime/
 test/*.log
 test/appointments.mjs

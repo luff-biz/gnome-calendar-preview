@@ -60,6 +60,13 @@ export default class ProductiveCalendarPreferences extends ExtensionPreferences 
             Gio.SettingsBindFlags.DEFAULT);
         listGroup.add(allDayRow);
 
+        const pastRow = new Adw.SwitchRow({
+            title: _('Vergangene und laufende Termine anzeigen'),
+            subtitle: _('Die letzten zwei beendeten und der laufende, bei 50 % Deckkraft'),
+        });
+        settings.bind('show-past', pastRow, 'active', Gio.SettingsBindFlags.DEFAULT);
+        listGroup.add(pastRow);
+
         const windowRow = new Adw.SpinRow({
             title: _('Vorschau-Zeitraum'),
             subtitle: _('Tage in die Zukunft — wird bei Bedarf automatisch vergrößert'),
@@ -78,14 +85,6 @@ export default class ProductiveCalendarPreferences extends ExtensionPreferences 
 
         const behaviourGroup = new Adw.PreferencesGroup({title: _('Verhalten')});
         page.add(behaviourGroup);
-
-        const clickRow = new Adw.SwitchRow({
-            title: _('Klick öffnet GNOME Calendar'),
-            subtitle: _('Aus: die Liste ist reine Anzeige und nicht anklickbar'),
-        });
-        settings.bind('open-calendar-on-click', clickRow, 'active',
-            Gio.SettingsBindFlags.DEFAULT);
-        behaviourGroup.add(clickRow);
 
         const debugRow = new Adw.SwitchRow({
             title: _('Ins Journal protokollieren'),

@@ -13,6 +13,8 @@ Signatures mirror gnome-shell 50's calendar-server:
 """
 
 import datetime
+import json
+import os
 import sys
 
 import gi
@@ -51,7 +53,46 @@ EXPECTED = ['Zahnarzt', 'Kundentermin', 'Team-Sync', 'Feiertag',
             'Vorstandssitzung', 'Herbstferien']
 
 
+# Echte Termine aus dem Laufzeitfixture, wenn vorhanden; sonst der synthetische
+# Plan. Das Fixture enthält echte Termindaten und wird nicht versioniert.
+FIXTURE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                       '.runtime', 'real-events.json')
+
+
+def load_fixture():
+    if not os.path.exists(FIXTURE):
+        return None
+    try:
+        with open(FIXTURE, encoding='utf-8') as handle:
+            data = json.load(handle)
+    except Exception as exc:  # noqa: BLE001
+        print(f'[stub] Fixture nicht lesbar: {exc!r}', flush=True)
+        return None
+    return data or None
+
+
+def with_running(events):
+    """Ein laufender Termin gehört in jeden Testlauf — der Block mit eigener
+    Überschrift und 75 % Deckkraft soll nicht ungeprüft bleiben."""
+    now = datetime.datetime.now()
+    start = int((now - datetime.timedelta(minutes=15)).timestamp())
+    end = int((now + datetime.timedelta(minutes=45)).timestamp())
+    return events + [('stub\nlaeuft-jetzt\n', 'Laeuft jetzt (Test)', start, end, {})]
+
+
 def build_events():
+    fixture = load_fixture()
+    if fixture:
+        events = []
+        for entry in fixture:
+            events.append((f"{entry['source_uid']}\n{entry['event_uid']}\n",
+                           entry['summary'], int(entry['start']), int(entry['end']),
+                           {}))
+        return with_running(events)
+    return with_running(build_synthetic_events())
+
+
+def build_synthetic_events():
     now = datetime.datetime.now()
     midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
     day = datetime.timedelta(days=1)
@@ -91,7 +132,7 @@ class Stub:
         self._connection = connection
         self._since = 0
         self._until = 0
-        self._sent = False
+        self._pushes = 0
 
     def handle_method_call(self, connection, sender, path, iface, method, params, invocation):
         if method != 'SetTimeRange':
@@ -100,18 +141,19 @@ class Stub:
         self._since, self._until, _force = params.unpack()
         print(f'[stub] SetTimeRange since={self._since} until={self._until}', flush=True)
         invocation.return_value(None)
-        if not self._sent:
-            self._sent = True
-            GLib.timeout_add(400, self._push)
+        # Bei jeder Bereichsanfrage erneut schicken: die Extension abonniert die
+        # Signale erst nach dem asynchronen Aufbau ihres Proxys. Ein einziger
+        # früher Schuss kann sie verfehlen.
+        GLib.timeout_add(400, self._push)
 
     def _push(self):
         try:
             events = build_events()
             self._connection.emit_signal(None, PATH, IFACE,
                                          'EventsAddedOrUpdated', events_variant(events))
-            print(f'[stub] pushed {len(events)} events', flush=True)
+            self._pushes += 1
+            print(f'[stub] push {self._pushes}: {len(events)} events', flush=True)
         except Exception as exc:  # noqa: BLE001
-            self._sent = False
             print(f'[stub] push failed: {exc!r}', flush=True)
         return GLib.SOURCE_REMOVE
 
@@ -136,6 +178,17 @@ def main():
     owned = Gio.bus_own_name_on_connection(connection, BUS_NAME,
                                            Gio.BusNameOwnerFlags.NONE, None, None)
     print(f'[stub] ready, owning {BUS_NAME}', flush=True)
+
+    # Zusätzlich in festen Abständen schicken, damit ein später startender
+    # Abonnent (die Extension nach dem Anmelden) die Termine sicher bekommt.
+    remaining = [8]
+
+    def repeat_push():
+        stub._push()
+        remaining[0] -= 1
+        return GLib.SOURCE_CONTINUE if remaining[0] > 0 else GLib.SOURCE_REMOVE
+
+    GLib.timeout_add_seconds(2, repeat_push)
 
     def stop():
         loop.quit()

@@ -1,33 +1,44 @@
-// Productive Calendar — shows the next N appointments in the GNOME date menu
-// instead of a list that only ever covers the selected day.
+// Productive Calendar — zeigt die nächsten Termine im Datumsmenü von GNOME
+// anstelle einer Liste, die immer nur den gewählten Tag kennt.
 //
-// Data source: the shell's own org.gnome.Shell.CalendarServer via
-// resource:///org/gnome/shell/ui/calendar.js (DBusEventSource). No polling —
-// the server pushes EventsAddedOrUpdated / EventsRemoved.
+// Zwei Quellen, bewusst getrennt:
+//   * org.gnome.Shell.CalendarServer (D-Bus) — Termine: Titel, Start, Ende, id.
+//     Dieselbe Schnittstelle, die das eingebaute Datumsmenü benutzt; sie kennt
+//     jeden Kalender, den Evolution Data Server verwaltet.
+//   * ECal/EDS — Kalendername über die Quellenregistrierung von EDS. Der Ort
+//     wird derzeit nicht angezeigt; die Abfrage dafür ist ausgebaut.
+//     Beides sind GNOME-Standardbibliotheken, keine Zusatzinstallation.
 //
-// The selection and formatting logic lives in lib/appointments.js, which has no
-// shell dependencies and is unit-tested separately.
+// Die Auswahl- und Formatierlogik liegt in lib/appointments.js (ohne
+// Shell-Abhängigkeiten, eigens getestet).
 
+import EDataServer from 'gi://EDataServer?version=1.2';
+import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
-import Clutter from 'gi://Clutter';
 import Pango from 'gi://Pango';
-import Shell from 'gi://Shell';
 import St from 'gi://St';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as Calendar from 'resource:///org/gnome/shell/ui/calendar.js';
 import {formatTime} from 'resource:///org/gnome/shell/misc/dateUtils.js';
-import {Extension, gettext as _, ngettext} from 'resource:///org/gnome/shell/extensions/extension.js';
+import {Extension, gettext as _} from 'resource:///org/gnome/shell/extensions/extension.js';
 
-import {formatWhen, isSameDay, upcomingEvents, widenedWindow} from './lib/appointments.js';
+import {formatWhen, isSameDay, selectAppointments, sourceUidOf, widenedWindow}
+    from './lib/appointments.js';
 
-const MAX_LOOKAHEAD_DAYS = 730; // hard upper bound when widening to fill the list
-// The event source fills its cache asynchronously, so an empty list right after
-// enabling means nothing. Only start widening once that has settled.
+const MAX_LOOKAHEAD_DAYS = 730; // harte Obergrenze beim Vergrößern des Fensters
+// Der Cache der Terminquelle füllt asynchron — eine leere Liste in den ersten
+// Millisekunden bedeutet nichts. Erst danach wird vergrößert.
 const WIDEN_AFTER_US = 5 * 1000 * 1000;
+const PAST_COUNT = 2; // fest: zwei vergangene Termine
+// Deckkraft: 0–255, direkt am Widget gesetzt (CSS `opacity` greift in St nicht).
+const PAST_OPACITY = 128;    // 50 %
+const RUNNING_OPACITY = 191; // 75 %
+// Das Zeitfenster muss auch in die Vergangenheit reichen, sonst kann der
+// gedimmte Block nie gefüllt werden.
+const PAST_WINDOW_DAYS = 7;
 
-const CALENDAR_APP_ID = 'org.gnome.Calendar.desktop';
 const SERVER_BUS_NAME = 'org.gnome.Shell.CalendarServer';
 const SERVER_PATH = '/org/gnome/Shell/CalendarServer';
 const SERVER_IFACE = 'org.gnome.Shell.CalendarServer';
@@ -36,22 +47,23 @@ const SETTINGS_KEYS = [
     'event-count',
     'lookahead-days',
     'show-all-day',
-    'open-calendar-on-click',
+    'show-past',
     'hide-calendar-grid',
     'debug-logging',
 ];
 
 /**
- * The list widget that takes the place of the native events section.
- * Built from plain widgets; shell internals are only touched where it has to be
- * inserted.
+ * Der Abschnitt, der die native Tagesliste ersetzt.
+ * Drei Zeilen je Eintrag: Titel fett, Zeitspanne bzw. "Ganztag" mit Ort,
+ * darunter klein der Kalendername. Reine Anzeige, kein Klickziel.
  */
 class UpcomingSection {
-    constructor({onActivate, formatEvent}) {
+    constructor({formatEvent}) {
         this._formatEvent = formatEvent;
         this._button = new St.Button({
             style_class: 'events-button productive-calendar-section',
-            can_focus: true,
+            reactive: false,
+            can_focus: false,
             x_expand: true,
         });
         this._box = new St.BoxLayout({
@@ -59,74 +71,94 @@ class UpcomingSection {
             orientation: Clutter.Orientation.VERTICAL,
             x_expand: true,
         });
-        this._title = new St.Label({style_class: 'events-title'});
         this._list = new St.BoxLayout({
             style_class: 'events-list',
             orientation: Clutter.Orientation.VERTICAL,
             x_expand: true,
         });
-        this._box.add_child(this._title);
         this._box.add_child(this._list);
         this._button.set_child(this._box);
-        this._button.connect('clicked', onActivate);
     }
 
     get actor() {
         return this._button;
     }
 
-    setClickable(clickable) {
-        this._button.reactive = clickable;
-        this._button.can_focus = clickable;
+    /** Die fertige zweite Zeile eines Eintrags — auch für die Protokollierung. */
+    formatLineFor(event, now) {
+        return this._formatEvent(event, now).when;
     }
 
-    setEvents(events, now) {
+    /**
+     * Reihenfolge: erst die zwei vergangenen (gedimmt), dann — wenn vorhanden —
+     * die laufenden mit eigener Überschrift, dann mit Überschrift die kommenden.
+     * Ganz oben steht keine Überschrift.
+     */
+    setEvents({past, running, bright}, now) {
         for (const child of this._list.get_children())
             child.destroy();
 
-        const count = events.length;
-        const title = ngettext('Next appointment', 'Next %d appointments', count);
-        this._title.text = count === 0
-            ? _('Upcoming appointments')
-            : (count === 1 ? title : title.format(count));
-
-        if (count === 0) {
+        if (past.length + running.length + bright.length === 0) {
             this._list.add_child(new St.Label({
-                text: _('Nothing scheduled'),
+                text: _('Nichts geplant'),
                 style_class: 'event-placeholder',
             }));
             return;
         }
 
-        for (const event of events)
-            this._list.add_child(this._makeRow(event, now));
+        for (const event of past)
+            this._list.add_child(this._makeRow(event, now, PAST_OPACITY));
+
+        if (running.length > 0) {
+            this._list.add_child(this._heading(_('Laufende Termine')));
+            for (const event of running)
+                this._list.add_child(this._makeRow(event, now, RUNNING_OPACITY));
+        }
+
+        const upcoming = bright.length === 0
+            ? _('Nächste Termine')
+            : (bright.length === 1
+                ? _('Nächster Termin')
+                : _('Nächste %d Termine').format(bright.length));
+        this._list.add_child(this._heading(upcoming));
+
+        for (const event of bright)
+            this._list.add_child(this._makeRow(event, now, 255));
     }
 
-    _makeRow(event, now) {
+    _heading(text) {
+        return new St.Label({
+            style_class: 'events-title productive-calendar-heading',
+            text,
+        });
+    }
+
+    _makeRow(event, now, opacity) {
+        const line = this._formatEvent(event, now);
+
         const row = new St.BoxLayout({
             style_class: 'productive-calendar-row',
+            orientation: Clutter.Orientation.VERTICAL,
             x_expand: true,
         });
-        if (event.date <= now && now < event.end)
-            row.add_style_class_name('productive-calendar-running');
+        row.opacity = opacity;
 
-        const summary = new St.Label({
-            style_class: 'event-summary',
-            text: event.summary || _('Untitled'),
-            x_expand: true,
-            y_align: Clutter.ActorAlign.CENTER,
-        });
-        summary.clutter_text.ellipsize = Pango.EllipsizeMode.END;
+        row.add_child(this._label('event-summary', event.summary || _('Ohne Titel')));
+        row.add_child(this._label('event-time', line.when));
 
-        const when = new St.Label({
-            style_class: 'event-time',
-            text: this._formatEvent(event, now),
-            y_align: Clutter.ActorAlign.CENTER,
-        });
+        if (line.calendar) {
+            const name = this._label('productive-calendar-calendar', line.calendar);
+            name.opacity = 178; // zurückgenommen; die Zeile dimmt zusätzlich
+            row.add_child(name);
+        }
 
-        row.add_child(summary);
-        row.add_child(when);
         return row;
+    }
+
+    _label(styleClass, text) {
+        const label = new St.Label({style_class: styleClass, text, x_expand: true});
+        label.clutter_text.ellipsize = Pango.EllipsizeMode.END;
+        return label;
     }
 }
 
@@ -136,19 +168,22 @@ export default class ProductiveCalendarExtension extends Extension {
         this._timeoutId = 0;
         this._assertTimeoutId = 0;
         this._lookaheadDays = 0;
-        this._selectedDate = new Date();
         this._enabledAt = GLib.get_monotonic_time();
+        this._selectedDate = new Date();
+
+        this._calendarNames = new Map();
+        // Merkt sich je Kanal die zuletzt protokollierte Aussage, damit
+        // unveränderte Zustände nicht wiederholt ins Journal wandern.
+        this._logged = new Map();
 
         this._dateMenu = Main.panel.statusArea.dateMenu ?? null;
         this._nativeEvents = this._dateMenu?._eventsItem ?? null;
-        // The native section's parent — cached, because that is exactly what gets
-        // detached while our list takes its place. Deriving it from
-        // _nativeEvents.get_parent() would yield null after the first swap.
+        // Der Container wird gemerkt: der native Abschnitt wird ja gerade
+        // ausgehängt, sein get_parent() wäre danach null.
         this._containerBox = this._nativeEvents?.get_parent() ?? null;
 
         if (!this._nativeEvents || !this._containerBox) {
-            // No date menu in this session mode, or shell internals changed.
-            log('[productive-calendar] date menu events section not found — nothing patched');
+            log('[productive-calendar] Terminabschnitt im Datumsmenü nicht gefunden — nichts geändert');
             this._dateMenu = null;
             this._nativeEvents = null;
             this._containerBox = null;
@@ -156,28 +191,33 @@ export default class ProductiveCalendarExtension extends Extension {
         }
 
         this._strings = {
-            today: _('Today'),
-            tomorrow: _('Tomorrow'),
-            allDay: _('all day'),
-            nowUntil: _('now–%s'),
+            allDay: _('Ganztag'),
+            clock: _('Uhr'),
         };
+
+        this._loadCalendarNames();
 
         this._eventSource = new Calendar.DBusEventSource();
         this._eventSource.connectObject('changed', () => this._rebuild(), this);
         this._eventSource.connectObject('notify::has-calendars', () => this._syncVisibility(), this);
 
         this._section = new UpcomingSection({
-            onActivate: () => this._activateCalendar(),
-            formatEvent: (event, now) => formatWhen(event, now, this._strings, formatTime),
+            formatEvent: (event, now) => ({
+                when: formatWhen(event, now, {
+                    strings: this._strings,
+                    timeOf: formatTime,
+                }),
+                calendar: this._calendarNames.get(sourceUidOf(event)) ?? null,
+            }),
         });
 
         this._openStateId = this._dateMenu.menu.connect('open-state-changed', (menu, isOpen) => {
             if (!isOpen)
                 return;
-            this._lookaheadDays = 0; // start from the configured window again
+            this._lookaheadDays = 0; // wieder vom eingestellten Fenster ausgehen
             this._queueRebuild(150);
-            // The month grid re-sets the shared time range when the menu opens;
-            // re-assert ours a moment later so future events keep arriving.
+            // Das Monatsgitter setzt beim Öffnen den gemeinsamen Zeitraum neu;
+            // unseren danach erneut setzen, damit künftige Termine weiterlaufen.
             this._queueRangeAssert(250);
         });
 
@@ -196,7 +236,7 @@ export default class ProductiveCalendarExtension extends Extension {
         this._requestRange();
         this._applySettings();
         this._syncVisibility();
-        this._debug('enabled');
+        this._debug('state', 'enabled', 'enabled');
         this._rebuild();
     }
 
@@ -230,7 +270,7 @@ export default class ProductiveCalendarExtension extends Extension {
 
         if (this._nativeEvents) {
             this._detach(this._nativeEvents);
-            this._attach(this._nativeEvents); // give the native day list back
+            this._attach(this._nativeEvents); // native Tagesliste zurückgeben
         }
 
         if (this._dateMenu?._calendar)
@@ -242,13 +282,16 @@ export default class ProductiveCalendarExtension extends Extension {
             this._eventSource = null;
         }
 
+        this._calendarNames?.clear();
+        this._calendarNames = new Map();
+
         this._settings = null;
         this._dateMenu = null;
         this._nativeEvents = null;
         this._containerBox = null;
     }
 
-    // ---- placement -------------------------------------------------------
+    // ---- Platzierung ------------------------------------------------------
 
     _attach(actor) {
         const parent = this._containerBox;
@@ -264,9 +307,10 @@ export default class ProductiveCalendarExtension extends Extension {
     }
 
     /**
-     * Ours instead of the native day list — but only while the native list has
-     * nothing to add: today is selected, calendars exist, and events are shown
-     * in this session mode. Browsing another day falls back to the native list.
+     * Unser Abschnitt steht anstelle der nativen Tagesliste — aber nur, solange
+     * diese nichts beizutragen hat: heute gewählt, Kalender vorhanden, Termine
+     * im Sitzungsmodus erlaubt. Beim Blättern auf einen anderen Tag übernimmt
+     * wieder die native Liste.
      */
     _syncVisibility() {
         if (!this._section || !this._nativeEvents)
@@ -285,13 +329,14 @@ export default class ProductiveCalendarExtension extends Extension {
             this._attach(this._section.actor);
         }
 
-        this._debug(`placing ${useNative ? 'native day list' : 'upcoming list'} ` +
+        const container = this._describeContainer();
+        this._debug('placement', `${useNative ? 'native' : 'ours'}|${container}`,
+            `placing ${useNative ? 'native day list' : 'upcoming list'} ` +
             `(showEvents=${showEvents}, hasCalendars=${hasCalendars}, ` +
-            `browsingOtherDay=${browsingOtherDay}) ` +
-            `container=[${this._describeContainer()}]`);
+            `browsingOtherDay=${browsingOtherDay}) container=[${container}]`);
     }
 
-    /** Which sections actually sit in the displays box right now. */
+    /** Welche Abschnitte gerade tatsächlich in der Box liegen. */
     _describeContainer() {
         if (!this._containerBox)
             return 'gone';
@@ -300,11 +345,14 @@ export default class ProductiveCalendarExtension extends Extension {
             .join(', ');
     }
 
-    // ---- data ------------------------------------------------------------
+    // ---- Daten: Termine über D-Bus ----------------------------------------
 
     _range(days) {
         const now = new Date();
-        return [now, new Date(now.getTime() + days * 24 * 60 * 60 * 1000)];
+        return [
+            new Date(now.getTime() - PAST_WINDOW_DAYS * 24 * 60 * 60 * 1000),
+            new Date(now.getTime() + days * 24 * 60 * 60 * 1000),
+        ];
     }
 
     _configuredDays() {
@@ -324,8 +372,8 @@ export default class ProductiveCalendarExtension extends Extension {
     }
 
     /**
-     * The time range is global state on the bus, shared with the month grid:
-     * whoever calls SetTimeRange last wins. So re-assert ours directly.
+     * Der Zeitraum ist globaler Zustand auf dem Bus und wird mit dem Monatsgitter
+     * geteilt: wer zuletzt SetTimeRange ruft, gewinnt. Also selbst nachfassen.
      */
     _queueRangeAssert(delayMs) {
         this._cancelAssertTimeout();
@@ -344,7 +392,7 @@ export default class ProductiveCalendarExtension extends Extension {
                     try {
                         connection.call_finish(result);
                     } catch (e) {
-                        logError(e, '[productive-calendar] SetTimeRange failed');
+                        logError(e, '[productive-calendar] SetTimeRange fehlgeschlagen');
                     }
                 });
             return GLib.SOURCE_REMOVE;
@@ -358,6 +406,7 @@ export default class ProductiveCalendarExtension extends Extension {
         const now = new Date();
         const wanted = Math.max(1, this._settings.get_int('event-count'));
         const showAllDay = this._settings.get_boolean('show-all-day');
+        const showPast = this._settings.get_boolean('show-past');
         const days = this._days();
         const [begin, end] = this._range(days);
 
@@ -365,26 +414,42 @@ export default class ProductiveCalendarExtension extends Extension {
         try {
             events = this._eventSource.getEvents(begin, end);
         } catch (e) {
-            logError(e, '[productive-calendar] could not read events');
+            logError(e, '[productive-calendar] Termine nicht lesbar');
             return;
         }
 
-        const upcoming = upcomingEvents(events, now, {count: wanted, showAllDay});
-        this._section.setEvents(upcoming, now);
-        this._section.setClickable(this._settings.get_boolean('open-calendar-on-click'));
+        const {past, running, bright} = selectAppointments(events, now, {
+            count: wanted,
+            showAllDay,
+            showPast,
+            pastCount: PAST_COUNT,
+        });
+        this._section.setEvents({past, running, bright}, now);
 
-        const settled = GLib.get_monotonic_time() - this._enabledAt > WIDEN_AFTER_US;
-        const wider = settled
-            ? widenedWindow(days, upcoming.length, wanted, MAX_LOOKAHEAD_DAYS)
+        const wider = GLib.get_monotonic_time() - this._enabledAt > WIDEN_AFTER_US
+            ? widenedWindow(days, bright.length, wanted, MAX_LOOKAHEAD_DAYS)
             : days;
         if (wider !== days) {
             this._lookaheadDays = wider;
             this._queueRangeAssert(0);
         }
 
-        this._debug(`render ${upcoming.length}/${wanted} (window ${days}d, ` +
-            `${events.length} events known): ` +
-            upcoming.map(e => e.summary).join(' | '));
+        const rendered = [
+            ...past.map(e => `(${e.summary})`),
+            ...running.map(e => `{${e.summary}}`),
+            ...bright.map(e => e.summary),
+        ];
+        // Nur die sichtbare Liste entscheidet, ob das eine neue Aussage ist —
+        // ein größer gewordenes Zeitfenster allein ist keine.
+        this._debug('render', rendered.join(' | '),
+            `render ${bright.length}/${wanted} hell, ${past.length} vergangen, ` +
+            `${running.length} laufend (window ${days}d, ${events.length} Termine bekannt): ` +
+            rendered.join(' | '));
+
+        if (bright.length > 0) {
+            const sample = this._section.formatLineFor(bright[0], now);
+            this._debug('sample', sample, `Beispielzeile: ${sample}`);
+        }
     }
 
     _queueRebuild(delayMs) {
@@ -410,10 +475,31 @@ export default class ProductiveCalendarExtension extends Extension {
         }
     }
 
-    // ---- settings & activation -------------------------------------------
+    // ---- Daten: Kalendernamen über EDS ------------------------------------
+
+    _loadCalendarNames() {
+        try {
+            const registry = EDataServer.SourceRegistry.new_sync(null);
+            for (const source of registry.list_sources(EDataServer.SOURCE_EXTENSION_CALENDAR)) {
+                if (!source.get_enabled())
+                    continue;
+                this._calendarNames.set(source.get_uid(), source.get_display_name());
+            }
+        } catch (e) {
+            logError(e, '[productive-calendar] Kalendernamen nicht lesbar');
+        }
+
+        const names = [...this._calendarNames.values()].join(', ');
+        this._debug('calendars', names, `Kalender: ${names}`);
+    }
+
+    // ---- Einstellungen ----------------------------------------------------
 
     _onSettingsChanged() {
         this._lookaheadDays = 0;
+        // Nach einer Einstellungsänderung soll der nächste Zustand wieder
+        // protokolliert werden, auch wenn er schon einmal dastand.
+        this._logged.clear();
         this._applySettings();
         this._requestRange();
         this._queueRebuild(0);
@@ -422,23 +508,18 @@ export default class ProductiveCalendarExtension extends Extension {
     _applySettings() {
         if (this._dateMenu?._calendar)
             this._dateMenu._calendar.visible = !this._settings.get_boolean('hide-calendar-grid');
-        this._section?.setClickable(this._settings.get_boolean('open-calendar-on-click'));
     }
 
-    _activateCalendar() {
-        if (!this._settings.get_boolean('open-calendar-on-click'))
+    /**
+     * Schreibt nur, wenn sich die Aussage eines Kanals geändert hat.
+     * Sonst würde jeder Aufbau dieselben Zeilen wiederholen.
+     */
+    _debug(channel, key, message) {
+        if (!this._settings?.get_boolean('debug-logging'))
             return;
-
-        this._dateMenu?.menu.close();
-        const app = Shell.AppSystem.get_default().lookup_app(CALENDAR_APP_ID);
-        if (app)
-            app.open_new_window(-1);
-        else
-            log('[productive-calendar] GNOME Calendar not found');
-    }
-
-    _debug(message) {
-        if (this._settings?.get_boolean('debug-logging'))
-            log(`[productive-calendar] ${message}`);
+        if (this._logged?.get(channel) === key)
+            return;
+        this._logged?.set(channel, key);
+        log(`[productive-calendar] ${message}`);
     }
 }

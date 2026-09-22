@@ -1,8 +1,10 @@
-// Pure appointment logic: no shell imports, no UI. Testable with plain gjs.
+// Reine Terminlogik: keine Shell-Abhängigkeiten, keine Oberfläche. Mit einfachem
+// gjs testbar (siehe test/appointments.test.mjs).
 //
-// The shell hands us CalendarEvent-like objects ({id, date, end, summary}) from
-// DBusEventSource. Everything here works on those and on injected formatting
-// dependencies, so the same code runs in the shell and in unit tests.
+// Die Shell liefert CalendarEvent-artige Objekte ({id, date, end, summary}).
+// Die id ist dreiteilig: "<Quell-UID>\n<Termin-UID>\n<Vorkommens-Stempel>".
+// Zusätzlich hineingereicht werden Kalendername (aus der Quell-UID) und Ort
+// (aus ECal) — beides wird hier nur eingesetzt, nicht beschafft.
 
 import GLib from 'gi://GLib';
 
@@ -18,7 +20,7 @@ export function isSameDay(a, b) {
         a.getDate() === b.getDate();
 }
 
-/** All-day appointments arrive as spans covering whole days (midnight to midnight). */
+/** Ganztägige Termine kommen als Spannen von Mitternacht zu Mitternacht. */
 export function isAllDay(event) {
     const start = event.date;
     const end = event.end;
@@ -33,62 +35,117 @@ export function isRunning(event, now) {
     return event.date <= now && now < event.end;
 }
 
-/** Whole days between the event's day and today; 0 = today, negative = past. */
-export function dayIndex(date, now) {
-    return Math.round((startOfDay(date) - startOfDay(now)) / DAY_MS);
-}
-
-/** 24-hour fallback; the shell injects its own locale-aware formatter. */
+/** 24-Stunden-Notnagel; die Shell reicht ihren eigenen Formatierer herein. */
 export function defaultTimeOf(date) {
     return GLib.DateTime.new_local(date.getFullYear(), date.getMonth() + 1,
         date.getDate(), date.getHours(), date.getMinutes(), 0).format('%H:%M');
 }
 
-export function dayLabel(date, now, strings, timeOf = defaultTimeOf) {
-    const days = dayIndex(date, now);
-    if (days <= 0)
-        return strings.today;
-    if (days === 1)
-        return strings.tomorrow;
+/** Wochentag und Datum, z. B. "Mi, 22. September" */
+export function defaultDayFull(date) {
+    const dt = GLib.DateTime.new_local(date.getFullYear(), date.getMonth() + 1,
+        date.getDate(), 0, 0, 0);
+    return `${dt.format('%a')}, ${date.getDate()}. ${dt.format('%B')}`;
+}
+
+/** Nur der Wochentag, z. B. "Do" */
+export function defaultWeekday(date) {
     return GLib.DateTime.new_local(date.getFullYear(), date.getMonth() + 1,
-        date.getDate(), 0, 0, 0).format('%a %d.%m.');
+        date.getDate(), 0, 0, 0).format('%a');
 }
 
 /**
- * Short "when" string for one appointment.
- * `strings` = {today, tomorrow, allDay, nowUntil} where nowUntil contains %s.
+ * Zweite Zeile eines Eintrags:
+ *
+ *   eintägig, mit Uhrzeit    Mi, 22. September, 10:00 - 22:00 Uhr
+ *   eintägig, ganztägig      Mi, 22. September, Ganztag
+ *   mehrtägig, ganztägig     Mi, 22. September - Do, 24. September
+ *   mehrtägig, mit Uhrzeit   Mi, 22. September, 14:00 - Do, 12:00 Uhr
+ *                            (über einen Monatswechsel: … - Sa, 2. Oktober, 12:00 Uhr)
+ *
+ * `strings` = {allDay, clock}
  */
-export function formatWhen(event, now, strings, timeOf = defaultTimeOf) {
+export function formatWhen(event, now, {
+    strings,
+    timeOf = defaultTimeOf,
+    dayFull = defaultDayFull,
+    weekday = defaultWeekday,
+} = {}) {
+    // Letzter Tag, den der Termin berührt — deshalb eine Millisekunde vor dem Ende.
+    const firstDay = startOfDay(event.date);
+    const lastDay = startOfDay(new Date(event.end.getTime() - 1));
+    const spansDays = lastDay.getTime() > firstDay.getTime();
+
+    if (isAllDay(event)) {
+        return spansDays
+            ? `${dayFull(event.date)} - ${dayFull(lastDay)}`
+            : `${dayFull(event.date)}, ${strings.allDay}`;
+    }
+
     const endTime = timeOf(event.end);
+    if (!spansDays)
+        return `${dayFull(event.date)}, ${timeOf(event.date)} - ${endTime} ${strings.clock}`;
 
-    if (isRunning(event, now))
-        return strings.nowUntil.replace('%s', endTime);
+    // Kurze Endangabe: nur der Wochentag, solange der Monat derselbe ist.
+    const endLabel = lastDay.getMonth() === firstDay.getMonth()
+        ? weekday(lastDay)
+        : dayFull(lastDay);
+    return `${dayFull(event.date)}, ${timeOf(event.date)} - ${endLabel}, ` +
+        `${endTime} ${strings.clock}`;
+}
 
-    if (isAllDay(event))
-        return `${dayLabel(event.date, now, strings, timeOf)} · ${strings.allDay}`;
+/** Quell-UID eines Termins (erster Teil der id). */
+export function sourceUidOf(event) {
+    return event.id?.split('\n')[0] ?? '';
+}
 
-    const times = `${timeOf(event.date)}–${endTime}`;
-    if (isSameDay(event.date, now))
-        return times;
-
-    return `${dayLabel(event.date, now, strings, timeOf)} · ${times}`;
+function byStart(a, b) {
+    return a.date - b.date || a.end - b.end || (a.summary ?? '').localeCompare(b.summary ?? '');
 }
 
 /**
- * The appointments to show: still relevant, optionally without all-day entries,
- * chronological, capped at `count`.
+ * Teilt die Termine in drei Listen:
+ *   past    — die letzten `pastCount` beendeten, ältester zuerst
+ *   running — was gerade läuft (nur terminierte; ein laufender Ganztagstermin
+ *             ist nichts "Verpasstes" und bleibt bei den kommenden)
+ *   bright  — was noch kommt, chronologisch, auf `count` begrenzt
+ *
+ * Ohne den gedimmten Block (showPast = false) muss ein gerade laufender Termin
+ * in die helle Liste, sonst verschwindet er lautlos.
  */
-export function upcomingEvents(events, now, {count = 6, showAllDay = true} = {}) {
-    return events
-        .filter(event => event.end > now)
-        .filter(event => showAllDay || !isAllDay(event))
-        .sort((a, b) => a.date - b.date || a.end - b.end || a.summary.localeCompare(b.summary))
-        .slice(0, count);
+export function selectAppointments(events, now, {
+    count = 6,
+    showAllDay = true,
+    showPast = true,
+    pastCount = 2,
+} = {}) {
+    const visible = events.filter(event => showAllDay || !isAllDay(event));
+    const timedRunning = visible
+        .filter(event => !isAllDay(event) && isRunning(event, now))
+        .sort(byStart);
+    const future = visible
+        .filter(event => event.end > now && !timedRunning.includes(event))
+        .sort(byStart);
+
+    if (!showPast)
+        return {
+            past: [],
+            running: [],
+            bright: [...timedRunning, ...future].sort(byStart).slice(0, count),
+        };
+
+    const finished = visible
+        .filter(event => !isAllDay(event) && event.end <= now)
+        .sort((a, b) => b.end - a.end)
+        .slice(0, pastCount)
+        .reverse();
+
+    return {past: finished, running: timedRunning, bright: future.slice(0, count)};
 }
 
 /**
- * A quiet window must not truncate the list: double it, up to the hard bound.
- * Returns the current value unchanged when nothing needs to grow.
+ * Ein ruhiger Zeitraum darf die Liste nicht abschneiden: Fenster verdoppeln,
+ * bis zur harten Obergrenze. Unverändert zurückgeben, wenn nichts wachsen muss.
  */
 export function widenedWindow(days, found, count, maxDays) {
     if (found >= count || days >= maxDays)

@@ -15,7 +15,26 @@ if [ "${1:-}" != "--inner" ]; then
     export XDG_CONFIG_HOME="$HERE/cfg"
     rm -rf "$XDG_CONFIG_HOME"
     mkdir -p "$XDG_CONFIG_HOME"
-    exec dbus-run-session -- bash "$0" --inner
+
+    # Echte Termine als Fixture — läuft in der laufenden Sitzung, nur lesend.
+    # Die Datei ist nicht versioniert, sie enthält echte Termine.
+    if [ "$CONTROL_MODE" != "1" ]; then
+        timeout 90 python3 "$HERE/make-real-fixture.py" ||
+            echo "Fixture nicht erzeugt — der Stub nimmt seinen synthetischen Plan"
+    fi
+
+    # Klassischer dbus-daemon statt dbus-run-session: Letzterer wartet auf den
+    # letzten Client, und die EDS-Dienste verlassen den privaten Bus nicht.
+    BUS_INFO="$(dbus-daemon --session --fork --print-address=1 --print-pid=1 --nopidfile)"
+    export DBUS_SESSION_BUS_ADDRESS="$(printf '%s\n' "$BUS_INFO" | sed -n 1p)"
+    export TEST_BUS_PID="$(printf '%s\n' "$BUS_INFO" | sed -n 2p)"
+
+    bash "$0" --inner
+    STATUS=$?
+
+    python3 "$HERE/kill-private-bus.py" "$DBUS_SESSION_BUS_ADDRESS" || true
+    kill "$TEST_BUS_PID" 2>/dev/null || true
+    exit "$STATUS"
 fi
 
 SETTINGS="org.gnome.shell.extensions.gnome-productive-calendar"
@@ -84,10 +103,11 @@ grep -F '[productive-calendar]' "$HERE/headless-shell.log" | sed 's/^/  /' || ec
 
 echo
 echo "=== Prüfung: gerenderte Liste ==="
-python3 - "$HERE/headless-shell.log" <<'PY'
-import sys
+python3 - "$HERE/headless-shell.log" "$HERE" <<'PY'
+import json, os, sys, time
 
 log = open(sys.argv[1], encoding='utf-8', errors='replace').read()
+here = sys.argv[2]
 lines = [l for l in log.splitlines() if 'render' in l]
 if not lines:
     print('  FAIL  keine render-Zeile gefunden')
@@ -96,25 +116,42 @@ if not lines:
 def entries(line):
     return [s.strip() for s in line.split('): ', 1)[-1].split(' | ') if s.strip()]
 
-# The richest render line: later ones during teardown are empty by design.
-shown = max((entries(l) for l in lines), key=len)
-print(f'  gerendert: {shown}')
+# Die reichste Zeile; spätere beim Abbau sind absichtlich leer.
+rich = max((entries(l) for l in lines), key=len)
+bright = [e for e in rich if not e.startswith(('(', '{'))]
+past = [e.strip('()') for e in rich if e.startswith('(')]
+running = [e.strip('{}') for e in rich if e.startswith('{')]
+print(f'  vergangen ({len(past)}): {past}')
+print(f'  laufend   ({len(running)}): {running}')
+print(f'  hell      ({len(bright)}): {bright}')
 
-# Same plan as test/stub_calendar_server.py
-expected = ['Zahnarzt', 'Kundentermin', 'Team-Sync', 'Feiertag',
-            'Vorstandssitzung', 'Herbstferien']
-
-missing = [name for name in expected if name not in shown]
-if missing:
-    print(f'  FAIL  fehlen: {missing}')
+fixture = os.path.join(here, '.runtime', 'real-events.json')
+if os.path.exists(fixture):
+    data = json.load(open(fixture, encoding='utf-8'))
+    now = time.time()
+    future = sorted((e for e in data if e['start'] > now), key=lambda e: e['start'])
+    expected = [e['summary'] for e in future][:6]
+    print(f'  erwartet aus echten Terminen ({len(future)} in der Zukunft)')
 else:
-    order = [shown.index(name) for name in expected]
-    if order == sorted(order):
-        print('  PASS  alle 6 erwarteten Termine, chronologisch')
-    else:
-        print(f'  FAIL  Reihenfolge stimmt nicht: {order}')
-if len(shown) > len(expected):
-    print(f'  HINWEIS  {len(shown)} Einträge gerendert')
+    expected = ['Zahnarzt', 'Kundentermin', 'Team-Sync', 'Feiertag',
+                'Vorstandssitzung', 'Herbstferien']
+    print('  erwartet aus dem synthetischen Plan')
+
+missing = [name for name in expected if name not in bright]
+if missing:
+    print(f'  FAIL  fehlen in der hellen Liste: {missing}')
+else:
+    order = [bright.index(name) for name in expected]
+    print('  PASS  alle erwarteten Termine, chronologisch' if order == sorted(order)
+          else f'  FAIL  Reihenfolge stimmt nicht: {order}')
+
+print(f'  {"PASS" if past else "HINWEIS"}  vergangene Zeilen: {past if past else "keine"}')
+print(f'  {"PASS" if running else "HINWEIS"}  laufende Zeilen: {running if running else "keine"}')
+
+names = [l.split('Kalender: ', 1)[1] for l in log.splitlines() if 'Kalender: ' in l]
+print(f'  Kalendernamen: {names[-1] if names else "(keine Zeile)"}')
+sample = [l.split('Beispielzeile: ', 1)[1] for l in log.splitlines() if 'Beispielzeile: ' in l]
+print(f'  Beispielzeile: {sample[-1] if sample else "(keine Zeile)"}')
 PY
 
 echo
