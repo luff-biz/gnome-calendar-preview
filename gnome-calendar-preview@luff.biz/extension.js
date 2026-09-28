@@ -221,7 +221,7 @@ class UpcomingSection {
 
         if (past.length + running.length + bright.length === 0) {
             this._list.add_child(new St.Label({
-                text: _('Nichts geplant'),
+                text: _('Nothing planned'),
                 style_class: 'event-placeholder',
             }));
             return;
@@ -237,16 +237,16 @@ class UpcomingSection {
             add(event, PAST_OPACITY);
 
         if (running.length > 0) {
-            this._list.add_child(this._heading(_('Laufende Termine')));
+            this._list.add_child(this._heading(_('Running appointments')));
             for (const event of running)
                 add(event, RUNNING_OPACITY);
         }
 
         const upcoming = bright.length === 0
-            ? _('Nächste Termine')
+            ? _('Upcoming appointments')
             : (bright.length === 1
-                ? _('Nächster Termin')
-                : _('Nächste %d Termine').format(bright.length));
+                ? _('Upcoming appointment')
+                : _('Next %d appointments').format(bright.length));
         this._list.add_child(this._heading(upcoming));
 
         for (const event of bright)
@@ -274,7 +274,7 @@ class UpcomingSection {
             orientation: Clutter.Orientation.VERTICAL,
             x_expand: true,
         });
-        const summary = this._label('event-summary', event.summary || _('Ohne Titel'));
+        const summary = this._label('event-summary', event.summary || _('Untitled'));
         const time = this._label('event-time', line.when);
         collapsed.add_child(summary);
         collapsed.add_child(time);
@@ -362,19 +362,19 @@ class UpcomingSection {
         });
 
         if (details.location)
-            box.add_child(this._field(_('Ort'), details.location));
+            box.add_child(this._field(_('Location'), details.location));
 
         if (details.description)
-            box.add_child(this._field(_('Beschreibung'), details.description));
+            box.add_child(this._field(_('Description'), details.description));
 
         if (details.attendees?.length)
-            box.add_child(this._field(_('Teilnehmer'), details.attendees.join(', ')));
+            box.add_child(this._field(_('Attendees'), details.attendees.join(', ')));
 
         // Auch ohne Felder sichtbar aufklappen statt stumm zu bleiben.
         if (box.get_n_children() === 0) {
             const empty = new St.Label({
                 style_class: 'calendar-preview-field-value',
-                text: _('Keine Details'),
+                text: _('No details'),
             });
             empty.clutter_text.ellipsize = Pango.EllipsizeMode.NONE;
             empty.opacity = 178;
@@ -475,8 +475,7 @@ export default class CalendarPreviewExtension extends Extension {
         }
 
         this._strings = {
-            allDay: _('Ganztag'),
-            clock: _('Uhr'),
+            allDay: _('All day'),
         };
 
         this._loadCalendarNames();

@@ -1,0 +1,96 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: gnome-calendar-preview 1\n"
+"Report-Msgid-Bugs-To: https://github.com/luff-biz/gnome-calendar-preview/issues\n"
+"PO-Revision-Date: 2026-09-28 16:00+0200\n"
+"Last-Translator: Steffen Luff <3155294+steffenluff@users.noreply.github.com>\n"
+"Language-Team: none\n"
+"Language: sv\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "Nothing planned"
+msgstr "Inget planerat"
+
+msgid "Running appointments"
+msgstr "Pågående möten"
+
+msgid "Upcoming appointments"
+msgstr "Kommande möten"
+
+msgid "Upcoming appointment"
+msgstr "Kommande möte"
+
+#, javascript-format
+msgid "Next %d appointments"
+msgstr "Nästa %d möten"
+
+msgid "Untitled"
+msgstr "Utan titel"
+
+msgid "Location"
+msgstr "Plats"
+
+msgid "Description"
+msgstr "Beskrivning"
+
+msgid "Attendees"
+msgstr "Deltagare"
+
+msgid "No details"
+msgstr "Inga detaljer"
+
+msgid "All day"
+msgstr "Hela dagen"
+
+msgid "Appointments"
+msgstr "Möten"
+
+msgid "Calendar"
+msgstr "Kalender"
+
+msgid "The month calendar in the date menu"
+msgstr "Månadskalendern i datummenyn"
+
+msgid "Hide month grid"
+msgstr "Dölj månadsrutnätet"
+
+msgid "The month calendar takes up space. The header and the appointment list remain."
+msgstr "Månadskalendern tar plats. Rubriken och möteslistan finns kvar."
+
+msgid "What is shown instead of the day list"
+msgstr "Vad som visas i stället för daglistan"
+
+msgid "Number of appointments"
+msgstr "Antal möten"
+
+msgid "How many of the next appointments are shown"
+msgstr "Hur många av de kommande mötena som visas"
+
+msgid "Show all-day appointments"
+msgstr "Visa heldagsmöten"
+
+msgid "Birthdays, holidays and other all-day entries"
+msgstr "Födelsedagar, helgdagar och andra heldagsposter"
+
+msgid "Show past and running appointments"
+msgstr "Visa tidigare och pågående möten"
+
+msgid "The last two finished and the current one, at 50% opacity"
+msgstr "De två senaste avslutade och det pågående, med 50 % opacitet"
+
+msgid "Preview period"
+msgstr "Förhandsvisningsperiod"
+
+msgid "Days into the future — automatically widened when needed"
+msgstr "Dagar framåt — utökas automatiskt vid behov"
+
+msgid "Behavior"
+msgstr "Beteende"
+
+msgid "Log to journal"
+msgstr "Logga till journal"
+
+msgid "For debugging: which appointments were shown"
+msgstr "För felsökning: vilka möten som visades"

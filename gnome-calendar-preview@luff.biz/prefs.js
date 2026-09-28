@@ -9,7 +9,7 @@ export default class CalendarPreviewPreferences extends ExtensionPreferences {
         const settings = this.getSettings();
 
         const page = new Adw.PreferencesPage({
-            title: _('Terminliste'),
+            title: _('Appointments'),
             icon_name: 'x-office-calendar-symbolic',
         });
         window.add(page);
@@ -17,14 +17,14 @@ export default class CalendarPreviewPreferences extends ExtensionPreferences {
         // ---- Kalender ----------------------------------------------------
 
         const calendarGroup = new Adw.PreferencesGroup({
-            title: _('Kalender'),
-            description: _('Der Monatskalender im Datumsmenü'),
+            title: _('Calendar'),
+            description: _('The month calendar in the date menu'),
         });
         page.add(calendarGroup);
 
         const gridRow = new Adw.SwitchRow({
-            title: _('Monatsgitter ausblenden'),
-            subtitle: _('Der Monatskalender nimmt Platz weg. Es bleiben die Kopfzeile und die Terminliste.'),
+            title: _('Hide month grid'),
+            subtitle: _('The month calendar takes up space. The header and the appointment list remain.'),
         });
         settings.bind('hide-calendar-grid', gridRow, 'active',
             Gio.SettingsBindFlags.DEFAULT);
@@ -33,14 +33,14 @@ export default class CalendarPreviewPreferences extends ExtensionPreferences {
         // ---- Terminliste -------------------------------------------------
 
         const listGroup = new Adw.PreferencesGroup({
-            title: _('Terminliste'),
-            description: _('Was anstelle der Tagesliste angezeigt wird'),
+            title: _('Appointments'),
+            description: _('What is shown instead of the day list'),
         });
         page.add(listGroup);
 
         const countRow = new Adw.SpinRow({
-            title: _('Anzahl der Termine'),
-            subtitle: _('Wie viele der nächsten Termine angezeigt werden'),
+            title: _('Number of appointments'),
+            subtitle: _('How many of the next appointments are shown'),
             adjustment: new Gtk.Adjustment({
                 lower: 1, upper: 20, step_increment: 1, page_increment: 5,
                 value: settings.get_int('event-count'),
@@ -53,23 +53,23 @@ export default class CalendarPreviewPreferences extends ExtensionPreferences {
         listGroup.add(countRow);
 
         const allDayRow = new Adw.SwitchRow({
-            title: _('Ganztägige Termine anzeigen'),
-            subtitle: _('Geburtstage, Ferien und andere ganztägige Einträge'),
+            title: _('Show all-day appointments'),
+            subtitle: _('Birthdays, holidays and other all-day entries'),
         });
         settings.bind('show-all-day', allDayRow, 'active',
             Gio.SettingsBindFlags.DEFAULT);
         listGroup.add(allDayRow);
 
         const pastRow = new Adw.SwitchRow({
-            title: _('Vergangene und laufende Termine anzeigen'),
-            subtitle: _('Die letzten zwei beendeten und der laufende, bei 50 % Deckkraft'),
+            title: _('Show past and running appointments'),
+            subtitle: _('The last two finished and the current one, at 50% opacity'),
         });
         settings.bind('show-past', pastRow, 'active', Gio.SettingsBindFlags.DEFAULT);
         listGroup.add(pastRow);
 
         const windowRow = new Adw.SpinRow({
-            title: _('Vorschau-Zeitraum'),
-            subtitle: _('Tage in die Zukunft — wird bei Bedarf automatisch vergrößert'),
+            title: _('Preview period'),
+            subtitle: _('Days into the future — automatically widened when needed'),
             adjustment: new Gtk.Adjustment({
                 lower: 1, upper: 730, step_increment: 10, page_increment: 60,
                 value: settings.get_int('lookahead-days'),
@@ -83,12 +83,12 @@ export default class CalendarPreviewPreferences extends ExtensionPreferences {
 
         // ---- Verhalten ---------------------------------------------------
 
-        const behaviourGroup = new Adw.PreferencesGroup({title: _('Verhalten')});
+        const behaviourGroup = new Adw.PreferencesGroup({title: _('Behavior')});
         page.add(behaviourGroup);
 
         const debugRow = new Adw.SwitchRow({
-            title: _('Ins Journal protokollieren'),
-            subtitle: _('Zur Fehlersuche: welche Termine angezeigt wurden'),
+            title: _('Log to journal'),
+            subtitle: _('For debugging: which appointments were shown'),
         });
         settings.bind('debug-logging', debugRow, 'active',
             Gio.SettingsBindFlags.DEFAULT);

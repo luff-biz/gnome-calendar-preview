@@ -1,0 +1,96 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: gnome-calendar-preview 1\n"
+"Report-Msgid-Bugs-To: https://github.com/luff-biz/gnome-calendar-preview/issues\n"
+"PO-Revision-Date: 2026-09-28 16:00+0200\n"
+"Last-Translator: Steffen Luff <3155294+steffenluff@users.noreply.github.com>\n"
+"Language-Team: none\n"
+"Language: da\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "Nothing planned"
+msgstr "Intet planlagt"
+
+msgid "Running appointments"
+msgstr "Igangværende aftaler"
+
+msgid "Upcoming appointments"
+msgstr "Kommende aftaler"
+
+msgid "Upcoming appointment"
+msgstr "Kommende aftale"
+
+#, javascript-format
+msgid "Next %d appointments"
+msgstr "Næste %d aftaler"
+
+msgid "Untitled"
+msgstr "Uden titel"
+
+msgid "Location"
+msgstr "Sted"
+
+msgid "Description"
+msgstr "Beskrivelse"
+
+msgid "Attendees"
+msgstr "Deltagere"
+
+msgid "No details"
+msgstr "Ingen detaljer"
+
+msgid "All day"
+msgstr "Hele dagen"
+
+msgid "Appointments"
+msgstr "Aftaler"
+
+msgid "Calendar"
+msgstr "Kalender"
+
+msgid "The month calendar in the date menu"
+msgstr "Månedskalenderen i datomenuen"
+
+msgid "Hide month grid"
+msgstr "Skjul månedsoversigten"
+
+msgid "The month calendar takes up space. The header and the appointment list remain."
+msgstr "Månedskalenderen fylder. Overskriften og aftalelisten forbliver."
+
+msgid "What is shown instead of the day list"
+msgstr "Hvad der vises i stedet for daglisten"
+
+msgid "Number of appointments"
+msgstr "Antal aftaler"
+
+msgid "How many of the next appointments are shown"
+msgstr "Hvor mange af de næste aftaler der vises"
+
+msgid "Show all-day appointments"
+msgstr "Vis heldagsaftaler"
+
+msgid "Birthdays, holidays and other all-day entries"
+msgstr "Fødselsdage, helligdage og andre heldagsposter"
+
+msgid "Show past and running appointments"
+msgstr "Vis tidligere og igangværende aftaler"
+
+msgid "The last two finished and the current one, at 50% opacity"
+msgstr "De to sidste afsluttede og den igangværende, ved 50 % dækning"
+
+msgid "Preview period"
+msgstr "Forhåndsvisningsperiode"
+
+msgid "Days into the future — automatically widened when needed"
+msgstr "Dage frem — udvides automatisk efter behov"
+
+msgid "Behavior"
+msgstr "Adfærd"
+
+msgid "Log to journal"
+msgstr "Log til journal"
+
+msgid "For debugging: which appointments were shown"
+msgstr "Til fejlfinding: hvilke aftaler der blev vist"

@@ -57,13 +57,13 @@ export function defaultWeekday(date) {
 /**
  * Zweite Zeile eines Eintrags:
  *
- *   eintägig, mit Uhrzeit    Mi, 22. September, 10:00 - 22:00 Uhr
+ *   eintägig, mit Uhrzeit    Mi, 22. September, 10:00 - 22:00
  *   eintägig, ganztägig      Mi, 22. September, Ganztag
  *   mehrtägig, ganztägig     Mi, 22. September - Do, 24. September
- *   mehrtägig, mit Uhrzeit   Mi, 22. September, 14:00 - Do, 12:00 Uhr
- *                            (über einen Monatswechsel: … - Sa, 2. Oktober, 12:00 Uhr)
+ *   mehrtägig, mit Uhrzeit   Mi, 22. September, 14:00 - Do, 12:00
+ *                            (über einen Monatswechsel: … - Sa, 2. Oktober, 12:00)
  *
- * `strings` = {allDay, clock}
+ * `strings` = {allDay}
  */
 export function formatWhen(event, now, {
     strings,
@@ -84,14 +84,13 @@ export function formatWhen(event, now, {
 
     const endTime = timeOf(event.end);
     if (!spansDays)
-        return `${dayFull(event.date)}, ${timeOf(event.date)} - ${endTime} ${strings.clock}`;
+        return `${dayFull(event.date)}, ${timeOf(event.date)} - ${endTime}`;
 
     // Kurze Endangabe: nur der Wochentag, solange der Monat derselbe ist.
     const endLabel = lastDay.getMonth() === firstDay.getMonth()
         ? weekday(lastDay)
         : dayFull(lastDay);
-    return `${dayFull(event.date)}, ${timeOf(event.date)} - ${endLabel}, ` +
-        `${endTime} ${strings.clock}`;
+    return `${dayFull(event.date)}, ${timeOf(event.date)} - ${endLabel}, ${endTime}`;
 }
 
 /** Quell-UID eines Termins (erster Teil der id). */

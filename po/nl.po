@@ -1,0 +1,96 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: gnome-calendar-preview 1\n"
+"Report-Msgid-Bugs-To: https://github.com/luff-biz/gnome-calendar-preview/issues\n"
+"PO-Revision-Date: 2026-09-28 16:00+0200\n"
+"Last-Translator: Steffen Luff <3155294+steffenluff@users.noreply.github.com>\n"
+"Language-Team: none\n"
+"Language: nl\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "Nothing planned"
+msgstr "Niets gepland"
+
+msgid "Running appointments"
+msgstr "Lopende afspraken"
+
+msgid "Upcoming appointments"
+msgstr "Aankomende afspraken"
+
+msgid "Upcoming appointment"
+msgstr "Aankomende afspraak"
+
+#, javascript-format
+msgid "Next %d appointments"
+msgstr "Volgende %d afspraken"
+
+msgid "Untitled"
+msgstr "Zonder titel"
+
+msgid "Location"
+msgstr "Locatie"
+
+msgid "Description"
+msgstr "Beschrijving"
+
+msgid "Attendees"
+msgstr "Deelnemers"
+
+msgid "No details"
+msgstr "Geen details"
+
+msgid "All day"
+msgstr "Hele dag"
+
+msgid "Appointments"
+msgstr "Afspraken"
+
+msgid "Calendar"
+msgstr "Kalender"
+
+msgid "The month calendar in the date menu"
+msgstr "De maandkalender in het datummenu"
+
+msgid "Hide month grid"
+msgstr "Maandrooster verbergen"
+
+msgid "The month calendar takes up space. The header and the appointment list remain."
+msgstr "De maandkalender neemt ruimte in. De kop en de afsprakenlijst blijven."
+
+msgid "What is shown instead of the day list"
+msgstr "Wat in plaats van de daglijst wordt getoond"
+
+msgid "Number of appointments"
+msgstr "Aantal afspraken"
+
+msgid "How many of the next appointments are shown"
+msgstr "Hoeveel van de volgende afspraken worden getoond"
+
+msgid "Show all-day appointments"
+msgstr "Toon afspraken voor de hele dag"
+
+msgid "Birthdays, holidays and other all-day entries"
+msgstr "Verjaardagen, feestdagen en andere vermeldingen voor de hele dag"
+
+msgid "Show past and running appointments"
+msgstr "Toon afgelopen en lopende afspraken"
+
+msgid "The last two finished and the current one, at 50% opacity"
+msgstr "De laatste twee afgeronde en de huidige, op 50% dekking"
+
+msgid "Preview period"
+msgstr "Voorbeeldperiode"
+
+msgid "Days into the future — automatically widened when needed"
+msgstr "Dagen in de toekomst — automatisch vergroot wanneer nodig"
+
+msgid "Behavior"
+msgstr "Gedrag"
+
+msgid "Log to journal"
+msgstr "Loggen naar journal"
+
+msgid "For debugging: which appointments were shown"
+msgstr "Voor debugging: welke afspraken werden getoond"

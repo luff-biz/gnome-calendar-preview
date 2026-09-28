@@ -73,7 +73,7 @@ eq(A.sourceUidOf({date: at(0, 9), end: at(0, 10)}), '', 'sourceUidOf: ohne id le
 
 // ---- formatWhen (Steffens Vorlage) ----------------------------------------
 
-const strings = {allDay: 'Ganztag', clock: 'Uhr'};
+const strings = {allDay: 'Ganztag'};
 const pad = n => String(n).padStart(2, '0');
 const timeOf = d => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 // Festes Deutsch statt Locale, damit der Test überall dasselbe prüft.
@@ -85,21 +85,21 @@ const weekday = d => WEEKDAYS[d.getDay()];
 const when = (ev, extra = {}) =>
     A.formatWhen(ev, now, {strings, timeOf, dayFull, weekday, ...extra});
 
-eq(when(running), 'So, 20. September, 14:00 - 15:30 Uhr',
+eq(when(running), 'So, 20. September, 14:00 - 15:30',
     'formatWhen: laufender Termin mit Datum und Zeitspanne');
-eq(when(later), 'So, 20. September, 18:00 - 19:30 Uhr', 'formatWhen: späterer Termin');
-eq(when(tomorrow), 'Mo, 21. September, 09:00 - 10:30 Uhr',
+eq(when(later), 'So, 20. September, 18:00 - 19:30', 'formatWhen: späterer Termin');
+eq(when(tomorrow), 'Mo, 21. September, 09:00 - 10:30',
     'formatWhen: morgiger Termin trägt sein eigenes Datum');
 eq(when(allDay3), 'Mi, 23. September, Ganztag', 'formatWhen: eintägig ganztägig');
 eq(when(allDay9), 'Di, 29. September - Do, 1. Oktober',
     'formatWhen: mehrtägig ganztägig als Datumsspanne');
 
 const overnight = event('Nachtschicht', at(0, 22), at(1, 2));
-eq(when(overnight), 'So, 20. September, 22:00 - Mo, 02:00 Uhr',
+eq(when(overnight), 'So, 20. September, 22:00 - Mo, 02:00',
     'formatWhen: mehrtägig mit Uhrzeit, kurze Endangabe (Wochentag)');
 
 const overMonth = event('Reise', new Date(2026, 8, 30, 14, 0), new Date(2026, 9, 2, 12, 0));
-eq(when(overMonth), 'Mi, 30. September, 14:00 - Fr, 2. Oktober, 12:00 Uhr',
+eq(when(overMonth), 'Mi, 30. September, 14:00 - Fr, 2. Oktober, 12:00',
     'formatWhen: über Monatsgrenze mit vollem Enddatum');
 
 eq(A.defaultTimeOf(at(0, 8, 5)), '08:05', 'defaultTimeOf: HH:MM');

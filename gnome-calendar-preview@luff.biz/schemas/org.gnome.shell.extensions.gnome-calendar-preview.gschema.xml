@@ -5,40 +5,40 @@
 
     <key name="show-past" type="b">
       <default>true</default>
-      <summary>Vergangene und laufende Termine anzeigen</summary>
-      <description>Zeigt zusätzlich die letzten zwei beendeten und den gerade laufenden Termin, bei 50 Prozent Deckkraft.</description>
+      <summary>Show past and running appointments</summary>
+      <description>Also shows the last two finished and the currently running appointment, at 50% opacity.</description>
     </key>
 
     <key name="hide-calendar-grid" type="b">
       <default>true</default>
-      <summary>Monatsgitter ausblenden</summary>
-      <description>Blendet den Monatskalender im Datumsmenü aus. Es bleiben die Kopfzeile und die Terminliste. Aus ist der Zustand, den GNOME mitbringt.</description>
+      <summary>Hide month grid</summary>
+      <description>Hides the month calendar in the date menu, leaving the header and the appointment list. Off is GNOME's default.</description>
     </key>
 
     <key name="event-count" type="i">
       <default>6</default>
       <range min="1" max="20"/>
-      <summary>Anzahl der Termine</summary>
-      <description>Wie viele der nächsten Termine die Liste zeigt.</description>
+      <summary>Number of appointments</summary>
+      <description>How many of the next appointments the list shows.</description>
     </key>
 
     <key name="lookahead-days" type="i">
       <default>120</default>
       <range min="1" max="730"/>
-      <summary>Vorschau-Zeitraum (Tage)</summary>
-      <description>Wie weit voraus beim Kalenderdienst angefragt wird. Wird automatisch vergrößert, wenn der Zeitraum zu wenige Termine enthält.</description>
+      <summary>Preview period (days)</summary>
+      <description>How far ahead the calendar service is queried. Automatically widened when the period contains too few appointments.</description>
     </key>
 
     <key name="show-all-day" type="b">
       <default>true</default>
-      <summary>Ganztägige Termine anzeigen</summary>
-      <description>Geburtstage, Ferien und andere ganztägige Einträge mitzählen.</description>
+      <summary>Show all-day appointments</summary>
+      <description>Include birthdays, holidays and other all-day entries.</description>
     </key>
 
     <key name="debug-logging" type="b">
       <default>false</default>
-      <summary>Ins Journal protokollieren</summary>
-      <description>Schreibt mit, welche Termine angezeigt und welcher Zeitraum angefragt wurde — zur Fehlersuche (journalctl --user -b | grep calendar-preview).</description>
+      <summary>Log to journal</summary>
+      <description>Records which appointments were shown and which period was queried — for debugging (journalctl --user -b | grep calendar-preview).</description>
     </key>
 
   </schema>
