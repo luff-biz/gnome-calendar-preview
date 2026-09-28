@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Installs Productive Calendar into the user's GNOME Shell extension directory.
+# Installs Calendar Preview into the user's GNOME Shell extension directory.
 # The extension source of truth lives in this checkout; this only copies.
 set -euo pipefail
 
-UUID="gnome-productive-calendar@luff.biz"
+UUID="gnome-calendar-preview@luff.biz"
 SRC="$(cd "$(dirname "$0")" && pwd)/$UUID"
 DEST="${XDG_DATA_HOME:-$HOME/.local/share}/gnome-shell/extensions/$UUID"
 

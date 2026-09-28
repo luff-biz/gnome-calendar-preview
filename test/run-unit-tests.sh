@@ -5,7 +5,7 @@
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
-EXT="$HERE/../gnome-productive-calendar@luff.biz"
+EXT="$HERE/../gnome-calendar-preview@luff.biz"
 SRC="$EXT/lib/appointments.js"
 
 cp "$SRC" "$HERE/appointments.mjs"

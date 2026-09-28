@@ -1,9 +1,9 @@
 {
-  "uuid": "gnome-productive-calendar@luff.biz",
-  "name": "Productive Calendar",
+  "uuid": "gnome-calendar-preview@luff.biz",
+  "name": "Calendar Preview",
   "description": "Replaces the date menu's single-day event list with the next N appointments, regardless of day boundaries.\n\nGNOME's calendar popup always shows exactly one day — by default today, which is of little use for planning. This extension puts a rolling list of the next appointments in the same place, drawn from the same Evolution Data Server calendars the shell already uses and updated live through org.gnome.Shell.CalendarServer.\n\n• Number of appointments configurable (default: 6)\n• All-day entries included by default, and shown as such\n• Running appointments are marked\n• While you browse another day in the month grid, the native day list takes over again\n• Clicking the list opens GNOME Calendar\n\nThe lookahead window widens automatically when needed, so the list stays filled across quiet periods.\n\nNote: the shell's calendar time range is global state shared with the month grid. The extension re-asserts its window whenever the date menu opens.",
   "shell-version": ["50"],
-  "settings-schema": "org.gnome.shell.extensions.gnome-productive-calendar",
-  "url": "https://github.com/luff-biz/gnome-productive-calendar",
+  "settings-schema": "org.gnome.shell.extensions.gnome-calendar-preview",
+  "url": "https://github.com/luff-biz/gnome-calendar-preview",
   "version": 1
 }

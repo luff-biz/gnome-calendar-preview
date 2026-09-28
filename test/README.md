@@ -6,7 +6,7 @@
 ./run-unit-tests.sh
 ```
 
-Copies `gnome-productive-calendar@luff.biz/lib/appointments.js` next to the test
+Copies `gnome-calendar-preview@luff.biz/lib/appointments.js` next to the test
 file and runs it with plain `gjs`, so the module under test is always the current
 source. Covers all-day detection, filtering of past entries, chronological order,
 the count limit, the "when" strings and the window-widening rule.
@@ -30,7 +30,7 @@ Runs in complete isolation and does **not** touch the running desktop session:
 The run passes when the extension reports `render 6/6` with the six expected
 summaries in chronological order, and when the container log line shows the
 upcoming list in the place of the native day list
-(`container=[events-button productive-calendar-section, …]`).
+(`container=[events-button calendar-preview-section, …]`).
 
 The control run exists to attribute log noise: it runs the same shell and the
 same stub without the extension. A `JS ERROR: TypeError: can't access property

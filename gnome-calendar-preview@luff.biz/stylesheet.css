@@ -1,16 +1,16 @@
-/* Productive Calendar — jede Zeile ist eine native Karte (`events-button`).
+/* Calendar Preview — jede Zeile ist eine native Karte (`events-button`).
    Padding, Radius, Hintergrund und Hover kommen vom Shell-Theme. Hier stehen
    nur der Einzug der Sektion und die Ergänzungen fürs Akkordeon. */
 
 /* Sektion: schlichter Container, Einzug wie die anderen Karten (margin 4px). */
-.productive-calendar-section {
+.calendar-preview-section {
     margin: 4px;
 }
 
 /* Überschrift ("Nächste X Termine"): etwas Luft oben/unten und horizontal
    bündig zum Karteninhalt — dasselbe Padding 0.818em wie die Karte, damit
    sie nicht links herausragt. */
-.productive-calendar-section .events-title {
+.calendar-preview-section .events-title {
     padding: 6px 0.818em;
 }
 
@@ -19,44 +19,44 @@
    Vertikal bleibt der Standard (4 px), zusammen mit `events-list` (spacing
    6 px) ergibt das 14 px Abstand zwischen den Karten — wie zwischen Wetter,
    Weltuhr und Sektion (displays-box spacing 6 px + margin 4 px). */
-.productive-calendar-row.events-button {
+.calendar-preview-row.events-button {
     margin: 4px 0;
 }
 
 /* Titel fett und darf für „…“ unter seine natürliche Breite schrumpfen. */
-.productive-calendar-row .event-summary {
+.calendar-preview-row .event-summary {
     font-weight: 700;
     min-width: 0;
 }
 
 /* Zeit: wie event-time — kleiner, grau. */
-.productive-calendar-row .event-time {
+.calendar-preview-row .event-time {
     font-weight: 400;
     font-size: 0.818em;
     color: #b2b2b4;
 }
 
 /* Zeile: Abstand zwischen Titel/Zeit/Kalender. */
-.productive-calendar-collapsed {
+.calendar-preview-collapsed {
     spacing: 6px;
 }
 
 /* Kalenderbezeichnung: klein. */
-.productive-calendar-row .productive-calendar-calendar {
+.calendar-preview-row .calendar-preview-calendar {
     font-size: 0.9em;
 }
 
 /* Zusatzfelder beim Aufklappen. */
-.productive-calendar-details {
+.calendar-preview-details {
     spacing: 6px;
     padding-top: 6px;
 }
 
-.productive-calendar-field {
+.calendar-preview-field {
     spacing: 1px;
 }
 
-.productive-calendar-field-caption {
+.calendar-preview-field-caption {
     font-weight: bold;
     font-size: 0.85em;
 }

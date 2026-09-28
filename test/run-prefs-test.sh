@@ -5,7 +5,7 @@
 set -uo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
-UUID="gnome-productive-calendar@luff.biz"
+UUID="gnome-calendar-preview@luff.biz"
 EXTDIR="${XDG_DATA_HOME:-$HOME/.local/share}/gnome-shell/extensions/$UUID"
 export GSETTINGS_SCHEMA_DIR="$EXTDIR/schemas:/usr/share/glib-2.0/schemas"
 

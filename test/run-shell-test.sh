@@ -6,7 +6,7 @@
 set -uo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
-UUID="gnome-productive-calendar@luff.biz"
+UUID="gnome-calendar-preview@luff.biz"
 EXTDIR="${XDG_DATA_HOME:-$HOME/.local/share}/gnome-shell/extensions/$UUID"
 export GSETTINGS_SCHEMA_DIR="$EXTDIR/schemas:/usr/share/glib-2.0/schemas"
 
@@ -37,7 +37,7 @@ if [ "${1:-}" != "--inner" ]; then
     exit "$STATUS"
 fi
 
-SETTINGS="org.gnome.shell.extensions.gnome-productive-calendar"
+SETTINGS="org.gnome.shell.extensions.gnome-calendar-preview"
 
 gsettings set org.gnome.shell disable-user-extensions false
 if [ "$CONTROL_MODE" = "1" ]; then
@@ -79,7 +79,7 @@ sleep 1
 
 echo
 echo "=== Zeilen der Extension im Shell-Log ==="
-grep -F '[productive-calendar]' "$HERE/headless-shell.log" | sed 's/^/  /' || echo "  (keine)"
+grep -F '[calendar-preview]' "$HERE/headless-shell.log" | sed 's/^/  /' || echo "  (keine)"
 
 echo
 echo "=== Prüfung: gerenderte Liste ==="

@@ -1,4 +1,4 @@
-# Productive Calendar
+# Calendar Preview
 
 A GNOME Shell extension that replaces the date menu's single-day event list with
 the **next N appointments**, regardless of day boundaries.
@@ -10,7 +10,7 @@ date, and the list underneath shows that date's entries only — by default toda
 That is a fine reminder and a poor planning tool, because from a planning
 perspective today is mostly gone.
 
-Productive Calendar keeps the date menu where it is and puts a rolling list of
+Calendar Preview keeps the date menu where it is and puts a rolling list of
 the upcoming appointments in place of the day list. Number of entries, all-day
 handling and the lookahead window are configurable.
 
@@ -35,7 +35,7 @@ Wayland.
 ## Settings
 
 ```sh
-gnome-extensions prefs gnome-productive-calendar@luff.biz
+gnome-extensions prefs gnome-calendar-preview@luff.biz
 ```
 
 The settings window is currently labelled in German.

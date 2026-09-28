@@ -1,4 +1,4 @@
-// Productive Calendar — zeigt die nächsten Termine im Datumsmenü von GNOME
+// Calendar Preview — zeigt die nächsten Termine im Datumsmenü von GNOME
 // anstelle einer Liste, die immer nur den gewählten Tag kennt.
 //
 // Zwei Quellen, bewusst getrennt:
@@ -83,7 +83,7 @@ class LinkLabel extends St.Label {
     _init(text) {
         super._init({
             reactive: true,
-            style_class: 'productive-calendar-field-value',
+            style_class: 'calendar-preview-field-value',
             x_expand: true,
             x_align: Clutter.ActorAlign.START,
         });
@@ -176,7 +176,7 @@ class UpcomingSection {
         // die Zeilen sind die Karten: `events-button` liefert Padding, Radius,
         // Hintergrund und Hover.
         this._actor = new St.BoxLayout({
-            style_class: 'productive-calendar-section',
+            style_class: 'calendar-preview-section',
             orientation: Clutter.Orientation.VERTICAL,
             x_expand: true,
         });
@@ -270,7 +270,7 @@ class UpcomingSection {
         const line = this._formatEvent(event, now);
 
         const collapsed = new St.BoxLayout({
-            style_class: 'productive-calendar-collapsed',
+            style_class: 'calendar-preview-collapsed',
             orientation: Clutter.Orientation.VERTICAL,
             x_expand: true,
         });
@@ -281,7 +281,7 @@ class UpcomingSection {
 
         let calendar = null;
         if (line.calendar) {
-            calendar = this._label('productive-calendar-calendar', line.calendar);
+            calendar = this._label('calendar-preview-calendar', line.calendar);
             calendar.opacity = 178; // zurückgenommen; die Zeile dimmt zusätzlich
             collapsed.add_child(calendar);
         }
@@ -297,7 +297,7 @@ class UpcomingSection {
         // Details innerhalb der Zeile auf. Padding, Radius und Hover kommen
         // vom Theme, das horizontale Margin entfernen wir per CSS.
         const row = new St.Button({
-            style_class: 'events-button productive-calendar-row',
+            style_class: 'events-button calendar-preview-row',
             x_expand: true,
             reactive: true,
             can_focus: false,
@@ -314,12 +314,12 @@ class UpcomingSection {
 
     _field(caption, text) {
         const row = new St.BoxLayout({
-            style_class: 'productive-calendar-field',
+            style_class: 'calendar-preview-field',
             orientation: Clutter.Orientation.VERTICAL,
             x_expand: true,
         });
         const captionLabel = new St.Label({
-            style_class: 'productive-calendar-field-caption',
+            style_class: 'calendar-preview-field-caption',
             text: caption,
         });
         captionLabel.clutter_text.ellipsize = Pango.EllipsizeMode.NONE;
@@ -356,7 +356,7 @@ class UpcomingSection {
         const details = this._detailsFor?.(event) ?? {};
 
         const box = new St.BoxLayout({
-            style_class: 'productive-calendar-details',
+            style_class: 'calendar-preview-details',
             orientation: Clutter.Orientation.VERTICAL,
             x_expand: true,
         });
@@ -373,7 +373,7 @@ class UpcomingSection {
         // Auch ohne Felder sichtbar aufklappen statt stumm zu bleiben.
         if (box.get_n_children() === 0) {
             const empty = new St.Label({
-                style_class: 'productive-calendar-field-value',
+                style_class: 'calendar-preview-field-value',
                 text: _('Keine Details'),
             });
             empty.clutter_text.ellipsize = Pango.EllipsizeMode.NONE;
@@ -441,7 +441,7 @@ class UpcomingSection {
     }
 }
 
-export default class ProductiveCalendarExtension extends Extension {
+export default class CalendarPreviewExtension extends Extension {
     enable() {
         this._settings = this.getSettings();
         this._timeoutId = 0;
@@ -467,7 +467,7 @@ export default class ProductiveCalendarExtension extends Extension {
         this._containerBox = this._nativeEvents?.get_parent() ?? null;
 
         if (!this._nativeEvents || !this._containerBox) {
-            log('[productive-calendar] Terminabschnitt im Datumsmenü nicht gefunden — nichts geändert');
+            log('[calendar-preview] Terminabschnitt im Datumsmenü nicht gefunden — nichts geändert');
             this._dateMenu = null;
             this._nativeEvents = null;
             this._containerBox = null;
@@ -686,7 +686,7 @@ export default class ProductiveCalendarExtension extends Extension {
                     try {
                         connection.call_finish(result);
                     } catch (e) {
-                        logError(e, '[productive-calendar] SetTimeRange fehlgeschlagen');
+                        logError(e, '[calendar-preview] SetTimeRange fehlgeschlagen');
                     }
                 });
             return GLib.SOURCE_REMOVE;
@@ -708,7 +708,7 @@ export default class ProductiveCalendarExtension extends Extension {
         try {
             events = this._eventSource.getEvents(begin, end);
         } catch (e) {
-            logError(e, '[productive-calendar] Termine nicht lesbar');
+            logError(e, '[calendar-preview] Termine nicht lesbar');
             return;
         }
 
@@ -781,7 +781,7 @@ export default class ProductiveCalendarExtension extends Extension {
                 this._calendarNames.set(source.get_uid(), source.get_display_name());
             }
         } catch (e) {
-            logError(e, '[productive-calendar] Kalendernamen nicht lesbar');
+            logError(e, '[calendar-preview] Kalendernamen nicht lesbar');
         }
 
         const names = [...this._calendarNames.values()].join(', ');
@@ -868,7 +868,7 @@ export default class ProductiveCalendarExtension extends Extension {
                         this._eventDetails.set(uid, details);
                     }
                 } catch (e) {
-                    logError(e, '[productive-calendar] Termindetails nicht lesbar');
+                    logError(e, '[calendar-preview] Termindetails nicht lesbar');
                 }
                 finish();
             });
@@ -893,7 +893,7 @@ export default class ProductiveCalendarExtension extends Extension {
                         try {
                             client = ECal.Client.connect_finish(result);
                         } catch (e) {
-                            logError(e, `[productive-calendar] ECal-Verbindung fehlgeschlagen: ` +
+                            logError(e, `[calendar-preview] ECal-Verbindung fehlgeschlagen: ` +
                                 `${source.get_display_name()}`);
                         }
                         if (client) {
@@ -906,7 +906,7 @@ export default class ProductiveCalendarExtension extends Extension {
                     });
             } catch (e) {
                 pending--;
-                logError(e, '[productive-calendar] ECal-Verbindung nicht gestartet');
+                logError(e, '[calendar-preview] ECal-Verbindung nicht gestartet');
             }
         }
 
@@ -942,6 +942,6 @@ export default class ProductiveCalendarExtension extends Extension {
         if (this._logged?.get(channel) === key)
             return;
         this._logged?.set(channel, key);
-        log(`[productive-calendar] ${message}`);
+        log(`[calendar-preview] ${message}`);
     }
 }

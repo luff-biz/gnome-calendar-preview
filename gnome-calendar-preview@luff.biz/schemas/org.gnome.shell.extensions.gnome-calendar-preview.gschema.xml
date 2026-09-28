@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <schemalist>
-  <schema id="org.gnome.shell.extensions.gnome-productive-calendar"
-          path="/org/gnome/shell/extensions/gnome-productive-calendar/">
+  <schema id="org.gnome.shell.extensions.gnome-calendar-preview"
+          path="/org/gnome/shell/extensions/gnome-calendar-preview/">
 
     <key name="show-past" type="b">
       <default>true</default>
@@ -38,7 +38,7 @@
     <key name="debug-logging" type="b">
       <default>false</default>
       <summary>Ins Journal protokollieren</summary>
-      <description>Schreibt mit, welche Termine angezeigt und welcher Zeitraum angefragt wurde — zur Fehlersuche (journalctl --user -b | grep productive-calendar).</description>
+      <description>Schreibt mit, welche Termine angezeigt und welcher Zeitraum angefragt wurde — zur Fehlersuche (journalctl --user -b | grep calendar-preview).</description>
     </key>
 
   </schema>
