@@ -12,17 +12,19 @@
 // Die Auswahl- und Formatierlogik liegt in lib/appointments.js (ohne
 // Shell-Abhängigkeiten, eigens getestet).
 
+import ECal from 'gi://ECal?version=2.0';
 import EDataServer from 'gi://EDataServer?version=1.2';
 import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
+import GObject from 'gi://GObject';
 import Pango from 'gi://Pango';
-import Shell from 'gi://Shell';
 import St from 'gi://St';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as Calendar from 'resource:///org/gnome/shell/ui/calendar.js';
 import {formatTime} from 'resource:///org/gnome/shell/misc/dateUtils.js';
+import * as Util from 'resource:///org/gnome/shell/misc/util.js';
 import {Extension, gettext as _} from 'resource:///org/gnome/shell/extensions/extension.js';
 
 import {eventUidOf, formatWhen, isSameDay, selectAppointments, sourceUidOf, widenedWindow}
@@ -39,8 +41,8 @@ const RUNNING_OPACITY = 191; // 75 %
 // Das Zeitfenster muss auch in die Vergangenheit reichen, sonst kann der
 // gedimmte Block nie gefüllt werden.
 const PAST_WINDOW_DAYS = 7;
-
-const CALENDAR_APP_ID = 'org.gnome.Calendar.desktop';
+// Termindetails (Ort, Beschreibung, Teilnehmer) höchstens alle 5 Minuten neu holen.
+const DETAILS_RELOAD_US = 5 * 60 * 1000 * 1000;
 const SERVER_BUS_NAME = 'org.gnome.Shell.CalendarServer';
 const SERVER_PATH = '/org/gnome/Shell/CalendarServer';
 const SERVER_IFACE = 'org.gnome.Shell.CalendarServer';
@@ -54,18 +56,127 @@ const SETTINGS_KEYS = [
     'debug-logging',
 ];
 
+/** Erster lesbarer Text aus einem ECal-Textfeld (z. B. Beschreibung). */
+function textValue(text) {
+    if (!text)
+        return null;
+    try {
+        const value = text.get_value();
+        if (value != null && String(value).trim())
+            return String(value).trim();
+    } catch (e) {
+        // kein get_value
+    }
+    if (text.value != null && String(text.value).trim())
+        return String(text.value).trim();
+    return null;
+}
+
+/**
+ * Beschriftung, die URLs anklickbar macht. Der Klick wird über eine
+ * ClickGesture behandelt, die nur dann „erkennt", wenn der Klick auf einer URL
+ * liegt — andernfalls geht der Klick an die Zeile (Button) und klappt zu.
+ * Vorbild ist der URLHighlighter der GNOME-Shell (messageList.js).
+ */
+const LinkLabel = GObject.registerClass(
+class LinkLabel extends St.Label {
+    _init(text) {
+        super._init({
+            reactive: true,
+            style_class: 'productive-calendar-field-value',
+            x_expand: true,
+            x_align: Clutter.ActorAlign.START,
+        });
+        this._linkColor = '#ccccff';
+        this._urls = [];
+
+        this.clutter_text.line_wrap = true;
+        this.clutter_text.line_wrap_mode = Pango.WrapMode.WORD_CHAR;
+        this.clutter_text.ellipsize = Pango.EllipsizeMode.NONE;
+
+        this.setMarkup(text);
+
+        this._clickGesture = new Clutter.ClickGesture();
+        this._clickGesture.connectObject(
+            'recognize', this._onClick.bind(this),
+            'may-recognize', this._checkInUrl.bind(this),
+            this);
+        this.add_action(this._clickGesture);
+    }
+
+    _checkInUrl() {
+        const {x, y} = this._clickGesture.get_coords_abs();
+        return this._findUrlAtPos(x, y) !== -1;
+    }
+
+    _onClick() {
+        const {x, y} = this._clickGesture.get_coords_abs();
+        const urlId = this._findUrlAtPos(x, y);
+        if (urlId === -1)
+            return;
+        let url = this._urls[urlId].url;
+        if (!url.includes(':'))
+            url = `http://${url}`;
+        Gio.app_info_launch_default_for_uri(
+            url, global.create_app_launch_context(0, -1));
+    }
+
+    setMarkup(text) {
+        this._text = text ? Util.fixMarkup(text, false) : '';
+        this.clutter_text.set_markup(this._text);
+        this._urls = Util.findUrls(this.clutter_text.text);
+        this._highlightUrls();
+    }
+
+    _highlightUrls() {
+        const urls = Util.findUrls(this._text);
+        let markup = '';
+        let pos = 0;
+        for (const url of urls) {
+            markup += this._text.substring(pos, url.pos);
+            markup += `<span foreground="${this._linkColor}"><u>${url.url}</u></span>`;
+            pos = url.pos + url.url.length;
+        }
+        markup += this._text.substring(pos);
+        this.clutter_text.set_markup(markup);
+    }
+
+    _findUrlAtPos(x, y) {
+        [, x, y] = this.transform_stage_point(x, y);
+        let findPos = -1;
+        for (let i = 0; i < this.clutter_text.text.length; i++) {
+            const [, px, py, lineHeight] = this.clutter_text.position_to_coords(i);
+            if (py > y || py + lineHeight < y || x < px)
+                continue;
+            findPos = i;
+        }
+        if (findPos === -1)
+            return -1;
+        for (let i = 0; i < this._urls.length; i++) {
+            if (findPos >= this._urls[i].pos &&
+                this._urls[i].pos + this._urls[i].url.length > findPos)
+                return i;
+        }
+        return -1;
+    }
+});
+
 /**
  * Der Abschnitt, der die native Tagesliste ersetzt.
  * Drei Zeilen je Eintrag: Titel fett, Zeitspanne bzw. "Ganztag" mit Ort,
  * darunter klein der Kalendername. Reine Anzeige, kein Klickziel.
  */
 class UpcomingSection {
-    constructor({formatEvent, onActivate}) {
+    constructor({formatEvent, detailsFor}) {
         this._formatEvent = formatEvent;
-        this._onActivate = onActivate;
-        // Der Abschnitt selbst ist keine Schaltfläche mehr — die Zeilen sind es.
+        this._detailsFor = detailsFor;
+        this._expandedEventId = null;
+        this._rows = new Map();
+        // Die Sektion ist ein schlichter Container (nur Einzug, siehe CSS),
+        // die Zeilen sind die Karten: `events-button` liefert Padding, Radius,
+        // Hintergrund und Hover.
         this._actor = new St.BoxLayout({
-            style_class: 'events-box productive-calendar-section',
+            style_class: 'productive-calendar-section',
             orientation: Clutter.Orientation.VERTICAL,
             x_expand: true,
         });
@@ -106,6 +217,7 @@ class UpcomingSection {
 
         for (const child of this._list.get_children())
             child.destroy();
+        this._rows = new Map();
 
         if (past.length + running.length + bright.length === 0) {
             this._list.add_child(new St.Label({
@@ -115,13 +227,19 @@ class UpcomingSection {
             return;
         }
 
+        const add = (event, opacity) => {
+            const row = this._makeRow(event, now, opacity);
+            this._list.add_child(row);
+            this._rows.set(event.id, {row, event});
+        };
+
         for (const event of past)
-            this._list.add_child(this._makeRow(event, now, PAST_OPACITY));
+            add(event, PAST_OPACITY);
 
         if (running.length > 0) {
             this._list.add_child(this._heading(_('Laufende Termine')));
             for (const event of running)
-                this._list.add_child(this._makeRow(event, now, RUNNING_OPACITY));
+                add(event, RUNNING_OPACITY);
         }
 
         const upcoming = bright.length === 0
@@ -132,12 +250,18 @@ class UpcomingSection {
         this._list.add_child(this._heading(upcoming));
 
         for (const event of bright)
-            this._list.add_child(this._makeRow(event, now, 255));
+            add(event, 255);
+
+        // Nach dem Neuaufbau wieder aufklappen, wenn vorher etwas offen war.
+        if (this._expandedEventId && this._rows.has(this._expandedEventId)) {
+            const {row, event} = this._rows.get(this._expandedEventId);
+            this._appendDetails(row, event);
+        }
     }
 
     _heading(text) {
         return new St.Label({
-            style_class: 'events-title productive-calendar-heading',
+            style_class: 'events-title',
             text,
         });
     }
@@ -145,33 +269,169 @@ class UpcomingSection {
     _makeRow(event, now, opacity) {
         const line = this._formatEvent(event, now);
 
-        const box = new St.BoxLayout({
+        const collapsed = new St.BoxLayout({
+            style_class: 'productive-calendar-collapsed',
             orientation: Clutter.Orientation.VERTICAL,
             x_expand: true,
         });
-        box.add_child(this._label('event-summary', event.summary || _('Ohne Titel')));
-        box.add_child(this._label('event-time', line.when));
+        const summary = this._label('event-summary', event.summary || _('Ohne Titel'));
+        const time = this._label('event-time', line.when);
+        collapsed.add_child(summary);
+        collapsed.add_child(time);
 
+        let calendar = null;
         if (line.calendar) {
-            const name = this._label('productive-calendar-calendar', line.calendar);
-            name.opacity = 178; // zurückgenommen; die Zeile dimmt zusätzlich
-            box.add_child(name);
+            calendar = this._label('productive-calendar-calendar', line.calendar);
+            calendar.opacity = 178; // zurückgenommen; die Zeile dimmt zusätzlich
+            collapsed.add_child(calendar);
         }
 
-        // Jede Zeile ist eine eigene Schaltfläche. `popup-menu-item` ist die
-        // Standard-Klasse der Shell für Hover in Popups: Hintergrund, Radius
-        // und Abstände kommen vom Theme — keine Eigenfarbe.
+        // Behälter: die eingeklappte Zeile plus, bei Bedarf, der Detailblock.
+        const container = new St.BoxLayout({
+            orientation: Clutter.Orientation.VERTICAL,
+            x_expand: true,
+        });
+        container.add_child(collapsed);
+
+        // Jede Zeile ist eine eigene Karte (events-button): Klick klappt die
+        // Details innerhalb der Zeile auf. Padding, Radius und Hover kommen
+        // vom Theme, das horizontale Margin entfernen wir per CSS.
         const row = new St.Button({
-            style_class: 'popup-menu-item productive-calendar-row',
+            style_class: 'events-button productive-calendar-row',
             x_expand: true,
             reactive: true,
             can_focus: false,
             track_hover: true,
-            child: box,
+            child: container,
         });
         row.opacity = opacity;
-        row.connect('clicked', () => this._onActivate?.(event));
+        row._container = container;
+        row._detailsBox = null;
+        row._collapsedLabels = [summary, time, calendar].filter(Boolean);
+        row.connect('clicked', () => this._toggleExpansion(event, row));
         return row;
+    }
+
+    _field(caption, text) {
+        const row = new St.BoxLayout({
+            style_class: 'productive-calendar-field',
+            orientation: Clutter.Orientation.VERTICAL,
+            x_expand: true,
+        });
+        const captionLabel = new St.Label({
+            style_class: 'productive-calendar-field-caption',
+            text: caption,
+        });
+        captionLabel.clutter_text.ellipsize = Pango.EllipsizeMode.NONE;
+        row.add_child(captionLabel);
+        // URLs im Wert sind anklickbar; der Klick auf eine URL öffnet sie,
+        // jeder andere Klick geht an die Zeile und klappt zu.
+        const value = new LinkLabel(text);
+        row.add_child(value);
+        return row;
+    }
+
+    /** Klick: Details innerhalb der Zeile auf- bzw. zuklappen. */
+    _toggleExpansion(event, row) {
+        if (this._expandedEventId === event.id) {
+            this._expandedEventId = null;
+            this._removeDetails(row);
+            return;
+        }
+
+        // Nur eine Zeile gleichzeitig offen.
+        if (this._expandedEventId && this._rows.has(this._expandedEventId)) {
+            const previous = this._rows.get(this._expandedEventId);
+            this._removeDetails(previous.row);
+        }
+
+        this._expandedEventId = event.id;
+        this._appendDetails(row, event);
+    }
+
+    /** Die zusätzlichen Felder — nichts davon steht schon in der Zeile. */
+    _appendDetails(row, event) {
+        this._setExpanded(row, true);
+
+        const details = this._detailsFor?.(event) ?? {};
+
+        const box = new St.BoxLayout({
+            style_class: 'productive-calendar-details',
+            orientation: Clutter.Orientation.VERTICAL,
+            x_expand: true,
+        });
+
+        if (details.location)
+            box.add_child(this._field(_('Ort'), details.location));
+
+        if (details.description)
+            box.add_child(this._field(_('Beschreibung'), details.description));
+
+        if (details.attendees?.length)
+            box.add_child(this._field(_('Teilnehmer'), details.attendees.join(', ')));
+
+        // Auch ohne Felder sichtbar aufklappen statt stumm zu bleiben.
+        if (box.get_n_children() === 0) {
+            const empty = new St.Label({
+                style_class: 'productive-calendar-field-value',
+                text: _('Keine Details'),
+            });
+            empty.clutter_text.ellipsize = Pango.EllipsizeMode.NONE;
+            empty.opacity = 178;
+            box.add_child(empty);
+        }
+
+        row._container.add_child(box);
+        row._detailsBox = box;
+    }
+
+    _removeDetails(row) {
+        if (row?._detailsBox) {
+            row._detailsBox.destroy();
+            row._detailsBox = null;
+        }
+        this._setExpanded(row, false);
+    }
+
+    /** Aufgeklappt bricht der Text um; eingeklappt wird gekürzt.
+        Die Breite liefert die Karte über x_expand — keine Pixelrechnung. */
+    _setExpanded(row, expanded) {
+        for (const label of row?._collapsedLabels ?? []) {
+            label.clutter_text.line_wrap = expanded;
+            label.clutter_text.ellipsize = expanded
+                ? Pango.EllipsizeMode.NONE
+                : Pango.EllipsizeMode.END;
+        }
+    }
+
+    /**
+     * Bindet ScrollView und Anzeigen-Box per BindConstraint an die Spaltenbreite,
+     * damit die Einträge die volle Spaltenbreite nutzen. St.BoxLayout füllt die
+     * Querachse nicht von selbst (gemessen), deshalb explizit binden.
+     */
+    bindToColumnWidth() {
+        const box = this._actor.get_parent();
+        const scrollView = box?.get_parent();
+        const column = scrollView?.get_parent();
+        if (!box || !scrollView || !column)
+            return;
+        box.add_constraint(new Clutter.BindConstraint({
+            source: column,
+            coordinate: Clutter.BindCoordinate.WIDTH,
+        }));
+        scrollView.add_constraint(new Clutter.BindConstraint({
+            source: column,
+            coordinate: Clutter.BindCoordinate.WIDTH,
+        }));
+    }
+
+    /** Nach dem Laden der Termindetails die offene Zeile aktualisieren. */
+    refreshExpanded() {
+        if (!this._expandedEventId || !this._rows.has(this._expandedEventId))
+            return;
+        const {row, event} = this._rows.get(this._expandedEventId);
+        this._removeDetails(row);
+        this._appendDetails(row, event);
     }
 
     _label(styleClass, text) {
@@ -191,6 +451,11 @@ export default class ProductiveCalendarExtension extends Extension {
         this._selectedDate = new Date();
 
         this._calendarNames = new Map();
+        this._sources = [];
+        this._eventDetails = new Map();
+        this._detailClients = new Map();
+        this._detailsLoading = false;
+        this._detailsAt = 0;
         // Merkt sich je Kanal die zuletzt protokollierte Aussage, damit
         // unveränderte Zustände nicht wiederholt ins Journal wandern.
         this._logged = new Map();
@@ -215,6 +480,7 @@ export default class ProductiveCalendarExtension extends Extension {
         };
 
         this._loadCalendarNames();
+        this._loadDetails(true);
 
         this._eventSource = new Calendar.DBusEventSource();
         this._eventSource.connectObject('changed', () => this._rebuild(), this);
@@ -228,7 +494,7 @@ export default class ProductiveCalendarExtension extends Extension {
                 }),
                 calendar: this._calendarNames.get(sourceUidOf(event)) ?? null,
             }),
-            onActivate: event => this._openInCalendar(event),
+            detailsFor: event => this._eventDetails.get(eventUidOf(event)) ?? null,
         });
 
         this._openStateId = this._dateMenu.menu.connect('open-state-changed', (menu, isOpen) => {
@@ -236,6 +502,7 @@ export default class ProductiveCalendarExtension extends Extension {
                 return;
             this._lookaheadDays = 0; // wieder vom eingestellten Fenster ausgehen
             this._queueRebuild(150);
+            this._loadDetails();
             // Das Monatsgitter setzt beim Öffnen den gemeinsamen Zeitraum neu;
             // unseren danach erneut setzen, damit künftige Termine weiterlaufen.
             this._queueRangeAssert(250);
@@ -256,6 +523,8 @@ export default class ProductiveCalendarExtension extends Extension {
         this._requestRange();
         this._applySettings();
         this._syncVisibility();
+        // ScrollView + Anzeigen-Box an die Spaltenbreite binden (100 % füllen).
+        this._section.bindToColumnWidth();
         this._debug('state', 'enabled', 'enabled');
         this._rebuild();
     }
@@ -304,6 +573,11 @@ export default class ProductiveCalendarExtension extends Extension {
 
         this._calendarNames?.clear();
         this._calendarNames = new Map();
+        this._sources = [];
+        this._eventDetails?.clear();
+        this._eventDetails = new Map();
+        this._detailClients?.clear();
+        this._detailClients = new Map();
 
         this._settings = null;
         this._dateMenu = null;
@@ -503,6 +777,7 @@ export default class ProductiveCalendarExtension extends Extension {
             for (const source of registry.list_sources(EDataServer.SOURCE_EXTENSION_CALENDAR)) {
                 if (!source.get_enabled())
                     continue;
+                this._sources.push(source);
                 this._calendarNames.set(source.get_uid(), source.get_display_name());
             }
         } catch (e) {
@@ -511,6 +786,132 @@ export default class ProductiveCalendarExtension extends Extension {
 
         const names = [...this._calendarNames.values()].join(', ');
         this._debug('calendars', names, `Kalender: ${names}`);
+    }
+
+    // ---- Daten: Ort, Beschreibung, Teilnehmer über ECal --------------------
+
+    _ecalQuery(begin, end) {
+        const fmt = date => GLib.DateTime.new_from_unix_local(date.getTime() / 1000)
+            .format('%Y%m%dT%H%M%S');
+        let timezone = 'UTC';
+        try {
+            timezone = GLib.TimeZone.new_local().get_identifier();
+        } catch {
+            // UTC bleibt
+        }
+        return `occur-in-time-range? (make-time "${fmt(begin)}") ` +
+            `(make-time "${fmt(end)}") "${timezone}"`;
+    }
+
+    _loadDetails(force = false) {
+        if (this._detailsLoading || this._sources.length === 0)
+            return;
+        if (!force && this._detailsAt &&
+            GLib.get_monotonic_time() - this._detailsAt < DETAILS_RELOAD_US)
+            return;
+
+        this._detailsLoading = true;
+        this._detailsAt = GLib.get_monotonic_time();
+
+        const [begin, end] = this._range(this._days());
+        const query = this._ecalQuery(begin, end);
+        let pending = 0;
+
+        const finish = () => {
+            if (--pending > 0)
+                return;
+            this._detailsLoading = false;
+            this._debug('details', `${this._eventDetails.size}`,
+                `Termindetails: ${this._eventDetails.size} bekannt`);
+            this._section?.refreshExpanded();
+        };
+
+        const collect = client => {
+            client.get_object_list_as_comps(query, null, (self, result) => {
+                try {
+                    const [ok, comps] = self.get_object_list_as_comps_finish(result);
+                    for (const comp of ok ? (comps ?? []) : []) {
+                        const uid = comp.get_uid();
+                        if (!uid)
+                            continue;
+
+                        const details = {location: null, description: null, attendees: []};
+
+                        try {
+                            details.location = comp.get_location() || null;
+                        } catch (e) {
+                            // ohne Ort
+                        }
+
+                        try {
+                            for (const text of comp.get_descriptions() ?? []) {
+                                const value = textValue(text);
+                                if (value) {
+                                    details.description = value;
+                                    break;
+                                }
+                            }
+                        } catch (e) {
+                            // ohne Beschreibung
+                        }
+
+                        try {
+                            for (const attendee of comp.get_attendees() ?? []) {
+                                const name = attendee.get_cn() || attendee.get_value();
+                                if (name && name.trim())
+                                    details.attendees.push(name.trim());
+                            }
+                        } catch (e) {
+                            // ohne Teilnehmer
+                        }
+
+                        this._eventDetails.set(uid, details);
+                    }
+                } catch (e) {
+                    logError(e, '[productive-calendar] Termindetails nicht lesbar');
+                }
+                finish();
+            });
+        };
+
+        for (const source of this._sources) {
+            const uid = source.get_uid();
+            const cached = this._detailClients.get(uid);
+            if (cached === 'failed')
+                continue;
+
+            pending++;
+            if (cached) {
+                collect(cached);
+                continue;
+            }
+
+            try {
+                ECal.Client.connect(source, ECal.ClientSourceType.EVENTS, 0, null,
+                    (self, result) => {
+                        let client = null;
+                        try {
+                            client = ECal.Client.connect_finish(result);
+                        } catch (e) {
+                            logError(e, `[productive-calendar] ECal-Verbindung fehlgeschlagen: ` +
+                                `${source.get_display_name()}`);
+                        }
+                        if (client) {
+                            this._detailClients.set(uid, client);
+                            collect(client);
+                        } else {
+                            this._detailClients.set(uid, 'failed');
+                            finish();
+                        }
+                    });
+            } catch (e) {
+                pending--;
+                logError(e, '[productive-calendar] ECal-Verbindung nicht gestartet');
+            }
+        }
+
+        if (pending === 0)
+            this._detailsLoading = false;
     }
 
     // ---- Einstellungen ----------------------------------------------------
@@ -522,29 +923,13 @@ export default class ProductiveCalendarExtension extends Extension {
         this._logged.clear();
         this._applySettings();
         this._requestRange();
+        this._loadDetails(true);
         this._queueRebuild(0);
     }
 
     _applySettings() {
         if (this._dateMenu?._calendar)
             this._dateMenu._calendar.visible = !this._settings.get_boolean('hide-calendar-grid');
-    }
-
-    /** Klick auf eine Zeile: den Termin direkt in GNOME Kalender öffnen. */
-    _openInCalendar(event) {
-        const uid = eventUidOf(event);
-        if (!uid)
-            return;
-
-        const app = Shell.AppSystem.get_default().lookup_app(CALENDAR_APP_ID);
-        if (!app) {
-            log('[productive-calendar] GNOME Calendar nicht gefunden');
-            return;
-        }
-
-        Main.panel.closeCalendar();
-        const context = global.create_app_launch_context(0, -1);
-        app.launch(['-u', uid], context);
     }
 
     /**

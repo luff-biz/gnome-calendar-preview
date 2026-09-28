@@ -1,16 +1,44 @@
-/* Productive Calendar — bewusst klein gehalten: die Palette kommt vom Shell-Thema.
-   Deckkraft und Zurücknahme der Kalenderzeile werden direkt am Widget gesetzt,
-   weil CSS `opacity` in St nicht verlässlich greift. Hier stehen nur Abstände,
-   Betonung und Schriftgrößen. */
+/* Productive Calendar — jede Zeile ist eine native Karte (`events-button`).
+   Padding, Radius, Hintergrund und Hover kommen vom Shell-Theme. Hier stehen
+   nur der Einzug der Sektion und die Ergänzungen fürs Akkordeon. */
 
-/* Productive Calendar — bewusst klein gehalten: Hover, Radius und Abstände der
-   Zeilen kommen vom Theme über die Klasse `popup-menu-item`. Hier stehen nur
-   Betonung und Schriftgrößen, die das Theme für diesen Abschnitt nicht kennt. */
+/* Sektion: schlichter Container, Einzug wie die anderen Karten (margin 4px). */
+.productive-calendar-section {
+    margin: 4px;
+}
 
-/* Titel fett. */
+/* Überschrift ("Nächste X Termine"): etwas Luft oben/unten und horizontal
+   bündig zum Karteninhalt — dasselbe Padding 0.818em wie die Karte, damit
+   sie nicht links herausragt. */
+.productive-calendar-section .events-title {
+    padding: 6px 0.818em;
+}
+
+/* Zeilen-Karten: das Theme gibt `margin: 4px` — horizontal auf 0, damit die
+   Karten bündig zum Wetter-Button liegen und nicht nach rechts überlaufen.
+   Vertikal bleibt der Standard (4 px), zusammen mit `events-list` (spacing
+   6 px) ergibt das 14 px Abstand zwischen den Karten — wie zwischen Wetter,
+   Weltuhr und Sektion (displays-box spacing 6 px + margin 4 px). */
+.productive-calendar-row.events-button {
+    margin: 4px 0;
+}
+
+/* Titel fett und darf für „…“ unter seine natürliche Breite schrumpfen. */
 .productive-calendar-row .event-summary {
-    font-weight: bold;
+    font-weight: 700;
     min-width: 0;
+}
+
+/* Zeit: wie event-time — kleiner, grau. */
+.productive-calendar-row .event-time {
+    font-weight: 400;
+    font-size: 0.818em;
+    color: #b2b2b4;
+}
+
+/* Zeile: Abstand zwischen Titel/Zeit/Kalender. */
+.productive-calendar-collapsed {
+    spacing: 6px;
 }
 
 /* Kalenderbezeichnung: klein. */
@@ -18,8 +46,17 @@
     font-size: 0.9em;
 }
 
-/* Zwischenüberschriften: "Laufende Termine", "Nächste 6 Termine". */
-.productive-calendar-section .productive-calendar-heading {
+/* Zusatzfelder beim Aufklappen. */
+.productive-calendar-details {
+    spacing: 6px;
+    padding-top: 6px;
+}
+
+.productive-calendar-field {
+    spacing: 1px;
+}
+
+.productive-calendar-field-caption {
     font-weight: bold;
-    padding-top: 4px;
+    font-size: 0.85em;
 }
